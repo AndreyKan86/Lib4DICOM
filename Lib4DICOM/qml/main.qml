@@ -72,7 +72,7 @@ ApplicationWindow {
             }
     }
 
-    //Файл, день рождения ID 
+    //Файл, день рождения ID  кнопка пуска
     component FileIdDate: Column {
        width: parent.width
        height: parent.height
@@ -178,27 +178,27 @@ ApplicationWindow {
        }   
         //Дата рождения
        Rectangle {
-        width: parent.width
-        height: parent.height / 3
-        color: "transparent" 
+          width: parent.width
+          height: parent.height / 3
+          color: "transparent" 
      
-         RowLayout  {
-            spacing: 10
-            anchors.left: parent.left
-            anchors.leftMargin: 10
-            anchors.verticalCenter: parent.verticalCenter
-            Text {
-                text: "Дата рождения:"
-                color: "lightgrey"
-                font.family: "Times New Roman"
-                font.pixelSize: 14
-                width: 100
-                height: 30
-                verticalAlignment: Text.AlignVCenter
-            }
-         }
+                RowLayout  {
+                    spacing: 10
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    Text {
+                        text: "Дата рождения:"
+                        color: "lightgrey"
+                        font.family: "Times New Roman"
+                        font.pixelSize: 14
+                        width: 100
+                        height: 30
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
        }
-        //Выбор файла и кнопка старт
+       //Выбор файла и кнопка старт
        Rectangle {
              width: parent.width
              height: parent.height / 3
@@ -240,7 +240,11 @@ ApplicationWindow {
                         text: "Приступить"
                         width: 80
                         height: 30
-                        onClicked: {}
+                        onClicked: {  
+                            appLogic.dataTransfer(root.patientID, root.studyID, root.seriesID, root.filePath, root.patientName, root.patientFamily, root.patinetFatherName,
+                                                   root.patientSex, root.patientWeightKG,  root.patientWeightG,  
+                                                   root.patinentAgeYear, root.patientAgeMonth, root.patinentAgeDay, root.patientBirthday )
+                        }
                 }
 
                 FileDialog {
@@ -389,9 +393,9 @@ ApplicationWindow {
                             }
                     }
                 } 
-           }
-
-           Rectangle {
+        }
+        //Sex
+        Rectangle {
             width: parent.width
             height: parent.height / 3
             color: "transparent" 
@@ -423,13 +427,17 @@ ApplicationWindow {
 
 
                       background: Rectangle {
-                      color: "#323232"
-                      radius: 4
-                      border.color: "#323232"
+                          color: "#323232"
+                          radius: 4
+                          border.color: "#323232"
                       }  
+
+                      onCurrentIndexChanged: {
+                          root.patientSex = model.get(currentIndex).value
+                      }
                  }
               }
-           }
+        }
     }
 
     //Фамилия имя отчество
@@ -466,7 +474,7 @@ ApplicationWindow {
                     onTextChanged: {
                         let filtered = text.replace(/[^а-яА-Яa-zA-Z\s\-]/g, "");
                         if (filtered !== text) {
-                        text = filtered;
+                            text = filtered;
                         }
                         root.patientFamily = text
                     }

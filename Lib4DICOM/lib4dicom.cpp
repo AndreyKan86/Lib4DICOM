@@ -26,22 +26,18 @@ Lib4DICOM::Lib4DICOM(QObject* parent)
 {
 }
 
-void Lib4DICOM::sayHello()
-{
-    qDebug() << "Hello, World!!!";
-}
-
 QImage Lib4DICOM::loadJPEG(const QString& path)
 {
     qDebug() << "Start load JPEG from:" << path;
 
-    QImage image(path);
+    QString localPath = QUrl(path).toLocalFile();
+    QImage image(localPath);
     if (image.isNull()) {
-        qDebug() << "Error in :" << path;
+        qDebug() << "Error loading image from:" << localPath;
         return QImage();
     }
 
-    qDebug() << "Load :" << image.width() << "x" << image.height();
+    qDebug() << "Loaded image:" << image.width() << "x" << image.height();
     return image;
 }
 
@@ -234,8 +230,6 @@ void Lib4DICOM::qiToByteVector(const std::vector<QImage>& vector_image) {
         std::string studyID = "1";
         std::string seriesID = "3";
 
-        sayHello();
-
         //QImage image = loadJPEG(path);
 
         saveImageAsDicom(
@@ -250,8 +244,92 @@ void Lib4DICOM::qiToByteVector(const std::vector<QImage>& vector_image) {
             &studyID,
             &seriesID
         );
-        ///////////////////////////////////////
     }
 }
+
+void Lib4DICOM::dataTransfer(
+    const QString& patientID,
+    const QString& studyID,
+    const QString& seriesID,
+    const QString& filename,
+    const QString& patientName,
+    const QString& patientFamily,
+    const QString& patientFatherName,
+    const QString& sex,
+    const QString& weightKG,
+    const QString& weightG,
+    const QString& patientAgeYear,
+    const QString& patientAgeMonth,
+    const QString& patientAgeDay,
+    const QString& patientBirthday
+)
+{
+    // Преобразование в std::string
+    const std::string patientID_std = patientID.toStdString();
+    const std::string studyID_std = studyID.toStdString();
+    const std::string seriesID_std = seriesID.toStdString();
+    const std::string filename_std = filename.toStdString();
+
+    // Генерация UID'ов
+    const std::string studyUID = generateStudyUID(&patientID_std, &studyID_std);
+    const std::string seriesUID = generateSeriesUID(&patientID_std, &studyID_std, &seriesID_std);
+    const char* studyUID_chr = studyUID.c_str();
+    const char* seriesUID_chr = seriesUID.c_str();
+
+    // Загрузка изображения
+    QImage img = loadJPEG(filename);
+    if (img.isNull()) {
+        qDebug() << "Image is null, aborting.";
+        return;
+    }
+
+    // Имя файла без расширения
+    size_t slashPos = filename_std.find_last_of("/\\");
+    std::string filenameWithExt = filename_std.substr(slashPos + 1);
+    size_t dotPos = filenameWithExt.find_last_of('.');
+    std::string nameFile = filenameWithExt.substr(0, dotPos);
+    QByteArray nameFileUtf8 = QByteArray::fromStdString(nameFile);
+    const char* nameFile_chr = nameFileUtf8.constData();
+
+    // Полное имя пациента: Фамилия^Имя^Отчество
+    QString fullName = QString("%1^%2^%3").arg(patientFamily, patientName, patientFatherName);
+    static QByteArray fullNameUtf8;
+    fullNameUtf8 = fullName.toUtf8();
+    const char* patientName_chr = fullNameUtf8.constData();
+
+    // Нормализация пола до 'M' / 'F' / 'O'
+    QString normalizedSex = sex.trimmed().left(1).toUpper();
+    static QByteArray sexUtf8;
+    sexUtf8 = normalizedSex.toUtf8();
+    const char* patientSex_chr = sexUtf8.constData();
+
+    // Вес как строка с точкой (пример: "75.5")
+    bool ok1 = false, ok2 = false;
+    double kg = weightKG.toDouble(&ok1);
+    double g = weightG.toDouble(&ok2);
+    double totalWeight = (ok1 ? kg : 0.0) + (ok2 ? g : 0.0) / 1000.0;
+    QString weightStr = QString::number(totalWeight, 'f', 1);
+    static QByteArray weightUtf8;
+    weightUtf8 = weightStr.toUtf8();
+    const char* patientWeightKG_chr = weightUtf8.constData();
+
+
+    qDebug() << sex;
+
+    // Вызов сохранения (без передачи возраста — он не нужен, если функция его не принимает)
+    saveImageAsDicom(
+        img,
+        &patientID_std,
+        studyUID_chr,
+        seriesUID_chr,
+        nameFile_chr,
+        patientName_chr,
+        patientSex_chr,
+        patientWeightKG_chr,
+        &studyID_std,
+        &seriesID_std
+    );
+}
+
 
 

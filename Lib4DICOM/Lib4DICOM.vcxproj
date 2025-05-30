@@ -112,7 +112,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="ViewLib4DICOM.cpp" />
     <ClInclude Include="lib4dicom_global.h" />
     <QtMoc Include="lib4dicom.h" />
     <ClCompile Include="lib4dicom.cpp" />

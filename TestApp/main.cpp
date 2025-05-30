@@ -19,12 +19,12 @@ int main(int argc, char* argv[])
     app.setWindowIcon(QIcon(":\\qml\\icon.png"));
     //app.setWindowIcon(QIcon("C:\\my_files\\DICOM\\Lib4DICOM\\Lib4DICOM\\qml\\icon.png"));
 
-
     qputenv("QT_QUICK_CONTROLS_STYLE", "Fusion"); //Стиль интерфейса
 
     QQmlApplicationEngine engine; //Движок QML 
 
     Lib4DICOM* lib = new Lib4DICOM(); 
+
     engine.rootContext()->setContextProperty("appLogic", lib); //Передача в QML объекта для управления
 
     engine.load(QUrl(QStringLiteral("qrc:/qml/main.qml"))); //Загрузка интерфейса
@@ -35,24 +35,6 @@ int main(int argc, char* argv[])
     return app.exec();
 }
 
-
-
-
-//property string patientID : ""
-//property string studyID : ""
-//property string seriesID : ""
-//property string patientWeightKG : ""
-//property string patientWeightG : ""
-//property string patientSex : ""
-//property string patinentAgeYear : ""
-//property string patientAgeMonth : ""
-//property string patinentAgeDay : ""
-//property string patientName : ""
-//property string patinentFamily : ""
-//property string patinentFatherName : ""
-//property string filePath : ""
-//property string patientBirthday : ""
-//
 
 
 
