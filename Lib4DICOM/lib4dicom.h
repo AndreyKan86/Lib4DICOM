@@ -19,7 +19,19 @@ public:
 
     void sayHello();
 
-
+    //Преобразование в DICOM
+    Q_INVOKABLE void saveImageAsDicom(
+        const QImage& image,
+        const std::string* patientID,
+        const char* studyUID,
+        const char* seriesUID,
+        const char* filename,
+        const char* patientName,
+        const char* sex,
+        const char* weight,
+        const std::string* studyID,
+        const std::string* seriesID
+    );
 
 private:
     const std::string prefix;
@@ -46,19 +58,4 @@ private:
         const std::string* studyID,
         const std::string* seriesID
     );
-
-    //Преобразование в DICOM
-    void saveImageAsDicom(
-        const QImage& image,
-        const std::string* patientID,
-        const char* studyUID,
-        const char* seriesUID,
-        const char* filename,
-        const char* patientName,
-        const char* sex,
-        const char* weight,
-        const std::string* studyID,
-        const std::string* seriesID
-    );
-
 };

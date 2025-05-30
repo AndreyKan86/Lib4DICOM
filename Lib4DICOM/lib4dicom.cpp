@@ -109,7 +109,6 @@ void Lib4DICOM::saveImageAsDicom(
 
     QImage img = image;
 
-
     // Приводим к нужному формату
     if (img.format() == QImage::Format_RGB888) {
         channels = 3;

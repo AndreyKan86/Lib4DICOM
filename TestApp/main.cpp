@@ -34,3 +34,32 @@ int main(int argc, char* argv[])
 
     return app.exec();
 }
+
+
+
+
+//property string patientID : ""
+//property string studyID : ""
+//property string seriesID : ""
+//property string patientWeightKG : ""
+//property string patientWeightG : ""
+//property string patientSex : ""
+//property string patinentAgeYear : ""
+//property string patientAgeMonth : ""
+//property string patinentAgeDay : ""
+//property string patientName : ""
+//property string patinentFamily : ""
+//property string patinentFatherName : ""
+//property string filePath : ""
+//property string patientBirthday : ""
+//
+
+
+
+
+
+
+
+
+
+
