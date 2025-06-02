@@ -129,6 +129,7 @@ void Lib4DICOM::saveImageAsDicom(
     DcmFileFormat fileformat;
     DcmDataset* dataset = fileformat.getDataset();
 
+    dataset->putAndInsertString(DCM_SpecificCharacterSet, "ISO_IR 192");
     // Пациент
 
     dataset->putAndInsertString(DCM_PatientName, patientName);

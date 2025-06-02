@@ -1,4 +1,4 @@
-﻿import QtQuick 2.15
+import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Window 
 import QtQuick.Layouts
@@ -471,6 +471,7 @@ ApplicationWindow {
                     height: 30
                     placeholderText: "Введите фамилию"
                     verticalAlignment: Text.AlignVCenter
+                    font.family: "Arial"
                     onTextChanged: {
                         let filtered = text.replace(/[^а-яА-Яa-zA-Z\s\-]/g, "");
                         if (filtered !== text) {
@@ -508,6 +509,7 @@ ApplicationWindow {
                                  width: 130
                                  height: 30
                                  placeholderText: "Введите имя"
+                                 font.family: "Arial"
                                  verticalAlignment: Text.AlignVCenter
                                  onTextChanged: {
                                         let filtered = text.replace(/[^а-яА-Яa-zA-Z\s\-]/g, "");
