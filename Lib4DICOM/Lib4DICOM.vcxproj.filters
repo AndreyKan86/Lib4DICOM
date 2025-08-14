@@ -21,6 +21,9 @@
       <UniqueIdentifier>{639EADAA-A684-42e4-A9AD-28FC9BCB8F7C}</UniqueIdentifier>
       <Extensions>ts</Extensions>
     </Filter>
+    <Filter Include="qml">
+      <UniqueIdentifier>{47bd31d4-6543-4ade-a0e9-b4c213beb9f6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib4dicom_global.h">
@@ -32,23 +35,23 @@
     <ClCompile Include="lib4dicom.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="qml\icon.png">
+      <Filter>qml</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <None Include="qml\main.qml">
-      <Filter>Source Files</Filter>
+      <Filter>qml</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="qml\resource.qrc">
-      <Filter>Resource Files</Filter>
+      <Filter>qml</Filter>
     </QtRcc>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="qml\icon.ico">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="qml\icon.png">
-      <Filter>Resource Files</Filter>
-    </Image>
   </ItemGroup>
 </Project>

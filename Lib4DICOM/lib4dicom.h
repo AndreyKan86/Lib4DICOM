@@ -1,4 +1,7 @@
 #pragma once
+
+#define DCMTK_DLL  // Для корректного импорта/экспорта символов DCMTK
+#include <dcmtk/config/osconfig.h>  // Должен быть ПЕРВЫМ среди includes DCMTK
 #include <QObject>
 #include "lib4dicom_global.h"
 
@@ -11,9 +14,39 @@ public:
     explicit Lib4DICOM(QObject* parent = nullptr);
 
 
-    void qiToByteVector(const std::vector<QImage>& vector_image); // Работает с вектором QImage
+    void qiToByteVector(
+        const std::vector<QImage>& images,
+        const QString& patientID,
+        const QString& studyID,
+        const QString& seriesID,
+        const QString& outputDir,
+        const QString& patientName,
+        const QString& sex,
+        const QString& weight
+    );
 
-    //Передача данных
+    void saveQImageAsDicom(
+        const QImage& image,
+        const QString& patientID,
+        const QString& studyID,
+        const QString& seriesID,
+        const QString& outputPath,
+        const QString& patientName,
+        const QString& sex,
+        const QString& weight
+    );
+
+    void saveQImagesAsDicom(
+        const std::vector<QImage>& images,
+        const QString& patientID,
+        const QString& studyID,
+        const QString& seriesID,
+        const QString& outputDir,
+        const QString& patientName,
+        const QString& sex,
+        const QString& weight
+    );
+
     Q_INVOKABLE void dataTransfer(
         const QString& patientID,
         const QString& studyID,
@@ -34,29 +67,30 @@ public:
 private:
     const std::string prefix;
 
-    QImage loadJPEG(const QString& path); //Принимает строку с адресом файла возвращает QImage
+    QImage loadJPEG(const QString& path); 
 
-    //Генерация уникального UID исследования
+
+
     std::string generateStudyUID(
         const std::string* patientID,
         const std::string* studyID
     );
 
-    //Генерация уникального UID изображения (ВРЕМЕННО!!)
+
     std::string generateInstanceUID(
         const std::string* patientID,
         const std::string* studyID,
         const std::string* seriesID
     );
 
-    //Генерация уникального UID серии
+
     std::string generateSeriesUID(
         const std::string* patientID,
         const std::string* studyID,
         const std::string* seriesID
     );
 
-    //Сохранение изображения
+
     void saveImageAsDicom(
         const QImage& image,
         const std::string* patientID,

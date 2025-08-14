@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.10.34916.146
+VisualStudioVersion = 17.14.36401.2
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Lib4DICOM", "Lib4DICOM\Lib4DICOM.vcxproj", "{B2E44EF1-A099-4D02-B5C2-B58D762BA833}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Lib4DICOM", "Lib4DICOM\Lib4DICOM.vcxproj", "{D1833694-34ED-4701-9108-63CDFE25DF01}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestApp", "TestApp\TestApp.vcxproj", "{716B5793-39BB-4E8A-82E1-F0F2306387F4}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestApp", "TestApp\TestApp.vcxproj", "{5CBA1EB0-1B3E-4DDA-8E6E-F510CA96F0A6}"
 	ProjectSection(ProjectDependencies) = postProject
-		{B2E44EF1-A099-4D02-B5C2-B58D762BA833} = {B2E44EF1-A099-4D02-B5C2-B58D762BA833}
+		{D1833694-34ED-4701-9108-63CDFE25DF01} = {D1833694-34ED-4701-9108-63CDFE25DF01}
 	EndProjectSection
 EndProject
 Global
@@ -16,19 +16,19 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{B2E44EF1-A099-4D02-B5C2-B58D762BA833}.Debug|x64.ActiveCfg = Debug|x64
-		{B2E44EF1-A099-4D02-B5C2-B58D762BA833}.Debug|x64.Build.0 = Debug|x64
-		{B2E44EF1-A099-4D02-B5C2-B58D762BA833}.Release|x64.ActiveCfg = Release|x64
-		{B2E44EF1-A099-4D02-B5C2-B58D762BA833}.Release|x64.Build.0 = Release|x64
-		{716B5793-39BB-4E8A-82E1-F0F2306387F4}.Debug|x64.ActiveCfg = Debug|x64
-		{716B5793-39BB-4E8A-82E1-F0F2306387F4}.Debug|x64.Build.0 = Debug|x64
-		{716B5793-39BB-4E8A-82E1-F0F2306387F4}.Release|x64.ActiveCfg = Release|x64
-		{716B5793-39BB-4E8A-82E1-F0F2306387F4}.Release|x64.Build.0 = Release|x64
+		{D1833694-34ED-4701-9108-63CDFE25DF01}.Debug|x64.ActiveCfg = Debug|x64
+		{D1833694-34ED-4701-9108-63CDFE25DF01}.Debug|x64.Build.0 = Debug|x64
+		{D1833694-34ED-4701-9108-63CDFE25DF01}.Release|x64.ActiveCfg = Release|x64
+		{D1833694-34ED-4701-9108-63CDFE25DF01}.Release|x64.Build.0 = Release|x64
+		{5CBA1EB0-1B3E-4DDA-8E6E-F510CA96F0A6}.Debug|x64.ActiveCfg = Debug|x64
+		{5CBA1EB0-1B3E-4DDA-8E6E-F510CA96F0A6}.Debug|x64.Build.0 = Debug|x64
+		{5CBA1EB0-1B3E-4DDA-8E6E-F510CA96F0A6}.Release|x64.ActiveCfg = Release|x64
+		{5CBA1EB0-1B3E-4DDA-8E6E-F510CA96F0A6}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {78B8D9E7-3FED-44AC-90A3-43C10DCC32B9}
+		SolutionGuid = {BE507C7F-9C27-4E34-B531-4D94FAB95925}
 	EndGlobalSection
 EndGlobal

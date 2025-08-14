@@ -1,47 +1,27 @@
-#include <QtCore/QCoreApplication>
-#include "lib4dicom.h""
-#include <QDebug>
-#include <QImage>
-#include <windows.h>
-#include <QApplication>
-#include <QCoreApplication>
-#include <QApplication>
-#include <qqmlapplicationengine.h>
-#include <QGuiApplication>
+#include <QApplication>  // РСЃРїРѕР»СЊР·СѓР№С‚Рµ Р»РёР±Рѕ QGuiApplication, Р»РёР±Рѕ QApplication
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QIcon>
-#include <qevent.h>
+#include "lib4dicom.h"
 
 int main(int argc, char* argv[])
 {
-    QGuiApplication app(argc, argv);    
-    app.setWindowIcon(QIcon(":\\qml\\icon.png"));
-    //app.setWindowIcon(QIcon("C:\\my_files\\DICOM\\Lib4DICOM\\Lib4DICOM\\qml\\icon.png"));
+    QApplication app(argc, argv); 
 
-    qputenv("QT_QUICK_CONTROLS_STYLE", "Fusion"); //Стиль интерфейса
+    app.setWindowIcon(QIcon(":/qml/icon.png"));  
 
-    QQmlApplicationEngine engine; //Движок QML 
+    qputenv("QT_QUICK_CONTROLS_STYLE", "Fusion");
 
-    Lib4DICOM* lib = new Lib4DICOM(); 
+    QQmlApplicationEngine engine;
 
-    engine.rootContext()->setContextProperty("appLogic", lib); //Передача в QML объекта для управления
+    Lib4DICOM* lib = new Lib4DICOM(&engine);
 
-    engine.load(QUrl(QStringLiteral("qrc:/qml/main.qml"))); //Загрузка интерфейса
-    qputenv("QML_IMPORT_TRACE", "1");
+    engine.rootContext()->setContextProperty("appLogic", lib);
+
+    engine.load(QUrl(QStringLiteral("qrc:/qml/main.qml")));
+
     if (engine.rootObjects().isEmpty())
         return -1;
 
     return app.exec();
 }
-
-
-
-
-
-
-
-
-
-
-

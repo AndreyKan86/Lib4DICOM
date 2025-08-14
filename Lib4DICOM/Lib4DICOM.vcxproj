@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{B2E44EF1-A099-4D02-B5C2-B58D762BA833}</ProjectGuid>
+    <ProjectGuid>{D1833694-34ED-4701-9108-63CDFE25DF01}</ProjectGuid>
     <Keyword>QtVS_v304</Keyword>
     <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">10.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">10.0</WindowsTargetPlatformVersion>
@@ -36,13 +36,13 @@
     <Import Project="$(QtMsBuild)\qt_defaults.props" />
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
-    <QtInstall>6.8.3_msvc2022_64</QtInstall>
-    <QtModules>core;gui;qml;quick;quickcontrols2;quickdialogs2;quicklayouts</QtModules>
+    <QtInstall>Qt 6.8.3</QtInstall>
+    <QtModules>core;gui;qml;quickdialogs2;quicklayouts</QtModules>
     <QtBuildConfig>debug</QtBuildConfig>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="QtSettings">
-    <QtInstall>6.8.3_msvc2022_64</QtInstall>
-    <QtModules>core;gui;qml;quick;quickcontrols2;quickdialogs2;quicklayouts;widgets</QtModules>
+    <QtInstall>Qt 6.8.3</QtInstall>
+    <QtModules>core;gui;qml;quickdialogs2;quicklayouts</QtModules>
     <QtBuildConfig>release</QtBuildConfig>
   </PropertyGroup>
   <Target Name="QtMsBuildNotFound" BeforeTargets="CustomBuild;ClCompile" Condition="!Exists('$(QtMsBuild)\qt.targets') or !Exists('$(QtMsBuild)\qt.props')">
@@ -65,21 +65,22 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Libs\DCMTK-debug\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Programs\DCMTK\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>oflog.lib;ofstd.lib;dcmdata.lib;dcmimgle.lib;dcmimage.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Libs\DCMTK-debug\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>oficonv.lib;ofstd.lib;oflog.lib;dcmdata.lib;ws2_32.lib;netapi32.lib;IPHLPAPI.Lib;Advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Programs\DCMTK\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <ClCompile>
-      <AdditionalIncludeDirectories>C:\Libs\DCMT-release\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-    </ClCompile>
     <Link>
-      <AdditionalDependencies>oflog.lib;ofstd.lib;dcmdata.lib;dcmimgle.lib;dcmimage.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Libs\DCMT-release\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>dcmdata.lib;oflog.lib;ws2_32.lib;netapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Programs\DCMTK\lib</AdditionalLibraryDirectories>
     </Link>
+    <ClCompile>
+      <AdditionalIncludeDirectories>C:\Programs\DCMTK\include</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ClCompile>
@@ -113,18 +114,18 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="lib4dicom_global.h" />
+    <ClInclude Include="resource.h" />
     <QtMoc Include="lib4dicom.h" />
     <ClCompile Include="lib4dicom.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="qml\icon.png" />
   </ItemGroup>
   <ItemGroup>
     <None Include="qml\main.qml" />
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="qml\resource.qrc" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="qml\icon.ico" />
-    <Image Include="qml\icon.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

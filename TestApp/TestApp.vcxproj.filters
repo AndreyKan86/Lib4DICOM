@@ -21,24 +21,31 @@
       <UniqueIdentifier>{639EADAA-A684-42e4-A9AD-28FC9BCB8F7C}</UniqueIdentifier>
       <Extensions>ts</Extensions>
     </Filter>
+    <Filter Include="Project Items">
+      <UniqueIdentifier>{cef0649c-da9a-4118-907c-6d516b118863}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <QtRcc Include="testapp.qrc">
-      <Filter>Resource Files</Filter>
-    </QtRcc>
-    <QtUic Include="testapp.ui">
-      <Filter>Form Files</Filter>
-    </QtUic>
-    <QtMoc Include="testapp.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
+    <None Include="TestApp.runsettings">
+      <Filter>Project Items</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="testapp.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="testapp.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+  </ItemGroup>
+  <ItemGroup>
+    <QtUic Include="testapp.ui">
+      <Filter>Resource Files</Filter>
+    </QtUic>
   </ItemGroup>
 </Project>

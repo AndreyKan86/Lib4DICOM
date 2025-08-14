@@ -10,8 +10,11 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <PropertyGroup>
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)\TestApp.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{716B5793-39BB-4E8A-82E1-F0F2306387F4}</ProjectGuid>
+    <ProjectGuid>{5CBA1EB0-1B3E-4DDA-8E6E-F510CA96F0A6}</ProjectGuid>
     <Keyword>QtVS_v304</Keyword>
     <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">10.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">10.0</WindowsTargetPlatformVersion>
@@ -36,13 +39,13 @@
     <Import Project="$(QtMsBuild)\qt_defaults.props" />
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
-    <QtInstall>6.8.3_msvc2022_64</QtInstall>
-    <QtModules>core;gui;qml;quick;quickcontrols2;quickdialogs2;quicklayouts;widgets</QtModules>
+    <QtInstall>Qt 6.8.3</QtInstall>
+    <QtModules>core;gui;qml;quickdialogs2;quicklayouts;testlib;quickwidgets</QtModules>
     <QtBuildConfig>debug</QtBuildConfig>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="QtSettings">
-    <QtInstall>6.8.3_msvc2022_64</QtInstall>
-    <QtModules>core;gui;qml;quick;quickcontrols2;quickdialogs2;quicklayouts;widgets</QtModules>
+    <QtInstall>Qt 6.8.3</QtInstall>
+    <QtModules>core;gui;qml;quickdialogs2;quicklayouts;testlib;quickwidgets</QtModules>
     <QtBuildConfig>release</QtBuildConfig>
   </PropertyGroup>
   <Target Name="QtMsBuildNotFound" BeforeTargets="CustomBuild;ClCompile" Condition="!Exists('$(QtMsBuild)\qt.targets') or !Exists('$(QtMsBuild)\qt.props')">
@@ -64,21 +67,18 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <Link>
-      <AdditionalLibraryDirectories>C:\my_files\DICOM\Lib4DICOM\x64\Debug</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Lib4DICOM.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\my_files\DICOM\Lib4DICOM\Lib4DICOM</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Programs\DCMTK\include;C:\Files\Work\Danil\Lib4DICOM\Lib4DICOM</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>LIB4DICOM_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>C:\Programs\DCMTK\lib;C:\Files\Work\Danil\Lib4DICOM\x64\Debug</AdditionalLibraryDirectories>
+      <AdditionalDependencies>oficonv.lib;ofstd.lib;oflog.lib;dcmdata.lib;ws2_32.lib;netapi32.lib;Lib4DICOM.lib;IPHLPAPI.Lib;Advapi32.lib</AdditionalDependencies>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <Link>
-      <AdditionalLibraryDirectories>C:\my_files\DICOM\Lib4DICOM\x64\Debug</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Lib4DICOM.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\my_files\DICOM\Lib4DICOM\Lib4DICOM</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Files\Work\Danil\Lib4DICOM\Lib4DICOM;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
@@ -89,7 +89,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
@@ -103,18 +103,29 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <QtRcc Include="testapp.qrc" />
-    <QtUic Include="testapp.ui" />
-    <QtMoc Include="testapp.h" />
-    <ClCompile Include="testapp.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="testapp.cpp">
+      <DynamicSource Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">input</DynamicSource>
+      <QtMocFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(Filename).moc</QtMocFileName>
+      <DynamicSource Condition="'$(Configuration)|$(Platform)'=='Release|x64'">input</DynamicSource>
+      <QtMocFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(Filename).moc</QtMocFileName>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="TestApp.runsettings" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="testapp.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtUic Include="testapp.ui" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">
