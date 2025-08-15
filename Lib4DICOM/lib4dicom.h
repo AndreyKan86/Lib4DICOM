@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#define DCMTK_DLL  // Для корректного импорта/экспорта символов DCMTK
 #include <QObject>
 #include "lib4dicom_global.h"
 
