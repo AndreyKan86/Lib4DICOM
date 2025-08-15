@@ -1,7 +1,6 @@
-#pragma once
+п»ї#pragma once
 
-#define DCMTK_DLL  // Для корректного импорта/экспорта символов DCMTK
-#include <dcmtk/config/osconfig.h>  // Должен быть ПЕРВЫМ среди includes DCMTK
+#define DCMTK_DLL  // Р”Р»СЏ РєРѕСЂСЂРµРєС‚РЅРѕРіРѕ РёРјРїРѕСЂС‚Р°/СЌРєСЃРїРѕСЂС‚Р° СЃРёРјРІРѕР»РѕРІ DCMTK
 #include <QObject>
 #include "lib4dicom_global.h"
 

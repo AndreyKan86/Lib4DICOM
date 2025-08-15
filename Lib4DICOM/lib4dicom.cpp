@@ -1,5 +1,4 @@
-#include "lib4dicom.h"
-#include <QDebug>
+п»ї#include <QDebug>
 #include <QImage>
 #include <dcmtk/config/osconfig.h>
 #include <dcmtk/dcmdata/dcuid.h>    
@@ -11,12 +10,6 @@
 #include <QUrl>
 #include <QFileInfo> 
 
-#include <filesystem>
-#include <iostream>
-#include <chrono>
-#include <thread>
-#include <ctime>
-#include <cstdio>
 #include <QGuiApplication>
 #include <QUrl>
 #include <QDebug>
@@ -47,11 +40,11 @@ void Lib4DICOM::saveQImageAsDicom(
     const std::string studyID_std = studyID.toStdString();
     const std::string seriesID_std = seriesID.toStdString();
 
-    // Генерация UID
+    // Р“РµРЅРµСЂР°С†РёСЏ UID
     const std::string studyUID = generateStudyUID(&patientID_std, &studyID_std);
     const std::string seriesUID = generateSeriesUID(&patientID_std, &studyID_std, &seriesID_std);
 
-    // Извлечение имени файла без расширения
+    // РР·РІР»РµС‡РµРЅРёРµ РёРјРµРЅРё С„Р°Р№Р»Р° Р±РµР· СЂР°СЃС€РёСЂРµРЅРёСЏ
     QFileInfo fileInfo(outputPath);
     QString baseName = fileInfo.baseName();
 
@@ -175,13 +168,13 @@ void Lib4DICOM::saveImageAsDicom(
     int channels;
     int bitsAllocated;
 
-    // Генерация Instance UID
+    // Р“РµРЅРµСЂР°С†РёСЏ Instance UID
     std::string uid = generateInstanceUID(patientID, studyID, seriesID);
     char instanceUID[100];
     std::strncpy(instanceUID, uid.c_str(), sizeof(instanceUID));
     instanceUID[sizeof(instanceUID) - 1] = '\0';
 
-    // Конвертация в подходящий формат
+    // РљРѕРЅРІРµСЂС‚Р°С†РёСЏ РІ РїРѕРґС…РѕРґСЏС‰РёР№ С„РѕСЂРјР°С‚
     QImage img;
     if (image.format() == QImage::Format_Grayscale8) {
         // 8-bit grayscale
@@ -197,26 +190,26 @@ void Lib4DICOM::saveImageAsDicom(
         bitsAllocated = 24;
     }
     else if (image.format() == QImage::Format_ARGB32) {
-        // 32-bit ARGB (конвертируем в RGB, игнорируя альфа-канал)
+        // 32-bit ARGB (РєРѕРЅРІРµСЂС‚РёСЂСѓРµРј РІ RGB, РёРіРЅРѕСЂРёСЂСѓСЏ Р°Р»СЊС„Р°-РєР°РЅР°Р»)
         img = image.convertToFormat(QImage::Format_RGB888);
         channels = 3;
         bitsAllocated = 24;
     }
     else {
-        // Все остальные форматы конвертируем в RGB
+        // Р’СЃРµ РѕСЃС‚Р°Р»СЊРЅС‹Рµ С„РѕСЂРјР°С‚С‹ РєРѕРЅРІРµСЂС‚РёСЂСѓРµРј РІ RGB
         img = image.convertToFormat(QImage::Format_RGB888);
         channels = 3;
         bitsAllocated = 24;
     }
 
-    // Создание DICOM файла
+    // РЎРѕР·РґР°РЅРёРµ DICOM С„Р°Р№Р»Р°
     DcmFileFormat fileformat;
     DcmDataset* dataset = fileformat.getDataset();
 
-    // Установка кодировки
+    // РЈСЃС‚Р°РЅРѕРІРєР° РєРѕРґРёСЂРѕРІРєРё
     dataset->putAndInsertString(DCM_SpecificCharacterSet, "ISO_IR 192");
 
-    // Основные DICOM теги
+    // РћСЃРЅРѕРІРЅС‹Рµ DICOM С‚РµРіРё
     dataset->putAndInsertString(DCM_PatientName, patientName);
     dataset->putAndInsertString(DCM_PatientID, patientID->c_str());
     dataset->putAndInsertString(DCM_StudyInstanceUID, studyUID);
@@ -224,12 +217,12 @@ void Lib4DICOM::saveImageAsDicom(
     dataset->putAndInsertString(DCM_SOPInstanceUID, instanceUID);
     dataset->putAndInsertString(DCM_SOPClassUID, UID_SecondaryCaptureImageStorage);
 
-    // Параметры изображения
+    // РџР°СЂР°РјРµС‚СЂС‹ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ
     dataset->putAndInsertUint16(DCM_Rows, static_cast<Uint16>(height));
     dataset->putAndInsertUint16(DCM_Columns, static_cast<Uint16>(width));
     dataset->putAndInsertUint16(DCM_SamplesPerPixel, static_cast<Uint16>(channels));
 
-    // Настройки битовой глубины
+    // РќР°СЃС‚СЂРѕР№РєРё Р±РёС‚РѕРІРѕР№ РіР»СѓР±РёРЅС‹
     if (channels == 1) {
         // 8-bit grayscale
         dataset->putAndInsertUint16(DCM_BitsAllocated, 8);
@@ -239,7 +232,7 @@ void Lib4DICOM::saveImageAsDicom(
     }
     else {
         // 24-bit RGB
-        dataset->putAndInsertUint16(DCM_BitsAllocated, 8);  // 8 бит на канал
+        dataset->putAndInsertUint16(DCM_BitsAllocated, 8);  // 8 Р±РёС‚ РЅР° РєР°РЅР°Р»
         dataset->putAndInsertUint16(DCM_BitsStored, 8);
         dataset->putAndInsertUint16(DCM_HighBit, 7);
         dataset->putAndInsertString(DCM_PhotometricInterpretation, "RGB");
@@ -248,7 +241,7 @@ void Lib4DICOM::saveImageAsDicom(
 
     dataset->putAndInsertUint16(DCM_PixelRepresentation, 0);  // unsigned
 
-    // Временные метки
+    // Р’СЂРµРјРµРЅРЅС‹Рµ РјРµС‚РєРё
     OFString dateStr, timeStr;
     DcmDate::getCurrentDate(dateStr);
     DcmTime::getCurrentTime(timeStr);
@@ -260,20 +253,20 @@ void Lib4DICOM::saveImageAsDicom(
     dataset->putAndInsertString(DCM_StudyDate, dateStr.c_str());
     dataset->putAndInsertString(DCM_StudyTime, timeStr.c_str());
 
-    // Демографические данные
+    // Р”РµРјРѕРіСЂР°С„РёС‡РµСЃРєРёРµ РґР°РЅРЅС‹Рµ
     dataset->putAndInsertString(DCM_PatientSex, sex);
     dataset->putAndInsertString(DCM_PatientWeight, weight);
 
-    // Позиция изображения (стандартные значения)
+    // РџРѕР·РёС†РёСЏ РёР·РѕР±СЂР°Р¶РµРЅРёСЏ (СЃС‚Р°РЅРґР°СЂС‚РЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ)
     dataset->putAndInsertString(DCM_ImageOrientationPatient, "1\\0\\0\\0\\1\\0");
     dataset->putAndInsertString(DCM_ImagePositionPatient, "0\\0\\0");
 
-    // Подготовка пиксельных данных с учетом выравнивания строк
+    // РџРѕРґРіРѕС‚РѕРІРєР° РїРёРєСЃРµР»СЊРЅС‹С… РґР°РЅРЅС‹С… СЃ СѓС‡РµС‚РѕРј РІС‹СЂР°РІРЅРёРІР°РЅРёСЏ СЃС‚СЂРѕРє
     QByteArray buffer;
-    const int bytesPerLine = img.bytesPerLine(); // Получаем реальную длину строки с учетом выравнивания
+    const int bytesPerLine = img.bytesPerLine(); // РџРѕР»СѓС‡Р°РµРј СЂРµР°Р»СЊРЅСѓСЋ РґР»РёРЅСѓ СЃС‚СЂРѕРєРё СЃ СѓС‡РµС‚РѕРј РІС‹СЂР°РІРЅРёРІР°РЅРёСЏ
     
     if (channels == 1) {
-        // Для 8-bit grayscale
+        // Р”Р»СЏ 8-bit grayscale
         buffer.resize(width * height);
         for (int y = 0; y < height; ++y) {
             const uchar* srcLine = img.constScanLine(y);
@@ -282,7 +275,7 @@ void Lib4DICOM::saveImageAsDicom(
         }
     }
     else {
-        // Для RGB (3 канала)
+        // Р”Р»СЏ RGB (3 РєР°РЅР°Р»Р°)
         buffer.resize(width * height * 3);
         for (int y = 0; y < height; ++y) {
             const uchar* srcLine = img.constScanLine(y);
@@ -291,19 +284,19 @@ void Lib4DICOM::saveImageAsDicom(
         }
     }
 
-    // Запись пиксельных данных
+    // Р—Р°РїРёСЃСЊ РїРёРєСЃРµР»СЊРЅС‹С… РґР°РЅРЅС‹С…
     dataset->putAndInsertUint8Array(
         DCM_PixelData,
         reinterpret_cast<Uint8*>(buffer.data()),
         buffer.size()
     );
 
-    // Генерация имени файла с временной меткой
+    // Р“РµРЅРµСЂР°С†РёСЏ РёРјРµРЅРё С„Р°Р№Р»Р° СЃ РІСЂРµРјРµРЅРЅРѕР№ РјРµС‚РєРѕР№
     std::time_t now = std::time(nullptr);
     char new_fn[100];
     std::snprintf(new_fn, sizeof(new_fn), "%s_%lld.dcm", filename, static_cast<long long>(now));
 
-    // Сохранение DICOM файла
+    // РЎРѕС…СЂР°РЅРµРЅРёРµ DICOM С„Р°Р№Р»Р°
     OFCondition status = fileformat.saveFile(OFFilename(new_fn), EXS_LittleEndianExplicit);
     if (status.good()) {
         qDebug() << "DICOM file saved successfully:" << new_fn;
@@ -314,7 +307,7 @@ void Lib4DICOM::saveImageAsDicom(
 }
 
 
-//Принимается на вход вектор с QImage. Публичная
+//РџСЂРёРЅРёРјР°РµС‚СЃСЏ РЅР° РІС…РѕРґ РІРµРєС‚РѕСЂ СЃ QImage. РџСѓР±Р»РёС‡РЅР°СЏ
 void Lib4DICOM::qiToByteVector(
     const std::vector<QImage>& images,
     const QString& patientID,
@@ -330,7 +323,7 @@ void Lib4DICOM::qiToByteVector(
         return;
     }
 
-    // Используем уже существующий метод saveQImagesAsDicom
+    // РСЃРїРѕР»СЊР·СѓРµРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёР№ РјРµС‚РѕРґ saveQImagesAsDicom
     saveQImagesAsDicom(
         images,
         patientID,
@@ -360,26 +353,26 @@ void Lib4DICOM::dataTransfer(
     const QString& patientBirthday
 )
 {
-    // Преобразование в std::string
+    // РџСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёРµ РІ std::string
     const std::string patientID_std = patientID.toStdString();
     const std::string studyID_std = studyID.toStdString();
     const std::string seriesID_std = seriesID.toStdString();
     const std::string filename_std = filename.toStdString();
 
-    // Генерация UID'ов
+    // Р“РµРЅРµСЂР°С†РёСЏ UID'РѕРІ
     const std::string studyUID = generateStudyUID(&patientID_std, &studyID_std);
     const std::string seriesUID = generateSeriesUID(&patientID_std, &studyID_std, &seriesID_std);
     const char* studyUID_chr = studyUID.c_str();
     const char* seriesUID_chr = seriesUID.c_str();
 
-    // Загрузка изображения
+    // Р—Р°РіСЂСѓР·РєР° РёР·РѕР±СЂР°Р¶РµРЅРёСЏ
     QImage img = loadJPEG(filename);
     if (img.isNull()) {
         qDebug() << "Image is null, aborting.";
         return;
     }
 
-    // Имя файла без расширения
+    // РРјСЏ С„Р°Р№Р»Р° Р±РµР· СЂР°СЃС€РёСЂРµРЅРёСЏ
     size_t slashPos = filename_std.find_last_of("/\\");
     std::string filenameWithExt = filename_std.substr(slashPos + 1);
     size_t dotPos = filenameWithExt.find_last_of('.');
@@ -387,19 +380,19 @@ void Lib4DICOM::dataTransfer(
     QByteArray nameFileUtf8 = QByteArray::fromStdString(nameFile);
     const char* nameFile_chr = nameFileUtf8.constData();
 
-    // Полное имя пациента: Фамилия^Имя^Отчество
+    // РџРѕР»РЅРѕРµ РёРјСЏ РїР°С†РёРµРЅС‚Р°: Р¤Р°РјРёР»РёСЏ^РРјСЏ^РћС‚С‡РµСЃС‚РІРѕ
     QString fullName = QString("%1^%2^%3").arg(patientFamily, patientName, patientFatherName);
     static QByteArray fullNameUtf8;
     fullNameUtf8 = fullName.toUtf8();
     const char* patientName_chr = fullNameUtf8.constData();
 
-    // Нормализация пола до 'M' / 'F' / 'O'
+    // РќРѕСЂРјР°Р»РёР·Р°С†РёСЏ РїРѕР»Р° РґРѕ 'M' / 'F' / 'O'
     QString normalizedSex = sex.trimmed().left(1).toUpper();
     static QByteArray sexUtf8;
     sexUtf8 = normalizedSex.toUtf8();
     const char* patientSex_chr = sexUtf8.constData();
 
-    // Вес как строка с точкой (пример: "75.5")
+    // Р’РµСЃ РєР°Рє СЃС‚СЂРѕРєР° СЃ С‚РѕС‡РєРѕР№ (РїСЂРёРјРµСЂ: "75.5")
     bool ok1 = false, ok2 = false;
     double kg = weightKG.toDouble(&ok1);
     double g = weightG.toDouble(&ok2);
@@ -412,7 +405,7 @@ void Lib4DICOM::dataTransfer(
 
     qDebug() << sex;
 
-    // Вызов сохранения (без передачи возраста — он не нужен, если функция его не принимает)
+    // Р’С‹Р·РѕРІ СЃРѕС…СЂР°РЅРµРЅРёСЏ (Р±РµР· РїРµСЂРµРґР°С‡Рё РІРѕР·СЂР°СЃС‚Р° вЂ” РѕРЅ РЅРµ РЅСѓР¶РµРЅ, РµСЃР»Рё С„СѓРЅРєС†РёСЏ РµРіРѕ РЅРµ РїСЂРёРЅРёРјР°РµС‚)
     saveImageAsDicom(
         img,
         &patientID_std,
