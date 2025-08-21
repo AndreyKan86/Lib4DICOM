@@ -1,13 +1,8 @@
 #pragma once
-
 #include <QtCore/qglobal.h>
 
-#ifndef BUILD_STATIC
-# if defined(LIB4DICOM_LIB)
+#if defined(LIB4DICOM_LIBRARY)
 #  define LIB4DICOM_EXPORT Q_DECL_EXPORT
-# else
-#  define LIB4DICOM_EXPORT Q_DECL_IMPORT
-# endif
 #else
-# define LIB4DICOM_EXPORT
+#  define LIB4DICOM_EXPORT Q_DECL_IMPORT
 #endif

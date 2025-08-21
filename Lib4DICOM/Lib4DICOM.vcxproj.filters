@@ -29,9 +29,6 @@
     <ClInclude Include="lib4dicom_global.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <QtMoc Include="lib4dicom.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
     <ClCompile Include="lib4dicom.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -53,5 +50,10 @@
     <QtRcc Include="qml\resource.qrc">
       <Filter>qml</Filter>
     </QtRcc>
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="lib4dicom.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
   </ItemGroup>
 </Project>

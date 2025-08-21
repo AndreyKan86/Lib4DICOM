@@ -1,106 +1,38 @@
 #pragma once
 
-#define DCMTK_DLL  // Для корректного импорта/экспорта символов DCMTK
-#include <dcmtk/config/osconfig.h>  // Должен быть ПЕРВЫМ среди includes DCMTK
-#include <QObject>
-#include "lib4dicom_global.h"
+#include <QAbstractListModel>
+#include <QString>
+#include <QList>
+#include "lib4dicom_global.h"   // подключаем макрос экспорта
 
-
-class LIB4DICOM_EXPORT Lib4DICOM : public QObject
-{
+class LIB4DICOM_EXPORT Lib4DICOM : public QAbstractListModel {
     Q_OBJECT
+        Q_PROPERTY(QAbstractItemModel* patientModel READ patientModel NOTIFY patientModelChanged)
 
 public:
+    enum Roles { FullNameRole = Qt::UserRole + 1, BirthYearRole, SexRole };
+
     explicit Lib4DICOM(QObject* parent = nullptr);
 
+    // --- QAbstractListModel ---
+    int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex& index, int role) const override;
+    QHash<int, QByteArray> roleNames() const override;
 
-    void qiToByteVector(
-        const std::vector<QImage>& images,
-        const QString& patientID,
-        const QString& studyID,
-        const QString& seriesID,
-        const QString& outputDir,
-        const QString& patientName,
-        const QString& sex,
-        const QString& weight
-    );
+    // --- Доступ для QML ---
+    QAbstractItemModel* patientModel();
 
-    void saveQImageAsDicom(
-        const QImage& image,
-        const QString& patientID,
-        const QString& studyID,
-        const QString& seriesID,
-        const QString& outputPath,
-        const QString& patientName,
-        const QString& sex,
-        const QString& weight
-    );
+    // --- Метод парсинга пациентов (вызывается из QML) ---
+    Q_INVOKABLE void scanPatients();
 
-    void saveQImagesAsDicom(
-        const std::vector<QImage>& images,
-        const QString& patientID,
-        const QString& studyID,
-        const QString& seriesID,
-        const QString& outputDir,
-        const QString& patientName,
-        const QString& sex,
-        const QString& weight
-    );
-
-    Q_INVOKABLE void dataTransfer(
-        const QString& patientID,
-        const QString& studyID,
-        const QString& seriesID,
-        const QString& filename,
-        const QString& patientName,
-        const QString& patientFamily,
-        const QString& patientFatherName,
-        const QString& sex,
-        const QString& weightKG,
-        const QString& weightG,
-        const QString& patinentAgeYear,
-        const QString& patientAgeMonth,
-        const QString& patinentAgeDay,
-        const QString& patientBirthday
-    );
+signals:
+    void patientModelChanged();
 
 private:
-    const std::string prefix;
-
-    QImage loadJPEG(const QString& path); 
-
-
-
-    std::string generateStudyUID(
-        const std::string* patientID,
-        const std::string* studyID
-    );
-
-
-    std::string generateInstanceUID(
-        const std::string* patientID,
-        const std::string* studyID,
-        const std::string* seriesID
-    );
-
-
-    std::string generateSeriesUID(
-        const std::string* patientID,
-        const std::string* studyID,
-        const std::string* seriesID
-    );
-
-
-    void saveImageAsDicom(
-        const QImage& image,
-        const std::string* patientID,
-        const char* studyUID,
-        const char* seriesUID,
-        const char* filename,
-        const char* patientName,
-        const char* sex,
-        const char* weight,
-        const std::string* studyID,
-        const std::string* seriesID
-    );
+    struct Patient {
+        QString fullName;
+        QString birthYear;
+        QString sex;
+    };
+    QList<Patient> m_patients;
 };

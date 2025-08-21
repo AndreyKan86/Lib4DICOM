@@ -42,7 +42,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="QtSettings">
     <QtInstall>Qt 6.8.3</QtInstall>
-    <QtModules>core;gui;qml;quickdialogs2;quicklayouts</QtModules>
+    <QtModules>core;gui;qml;quickdialogs2;quicklayouts;concurrent</QtModules>
     <QtBuildConfig>release</QtBuildConfig>
   </PropertyGroup>
   <Target Name="QtMsBuildNotFound" BeforeTargets="CustomBuild;ClCompile" Condition="!Exists('$(QtMsBuild)\qt.targets') or !Exists('$(QtMsBuild)\qt.props')">
@@ -65,27 +65,29 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Programs\DCMTK\include</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>C:\Programs\DCMTK_MD\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <AdditionalDependencies>oficonv.lib;ofstd.lib;oflog.lib;dcmdata.lib;ws2_32.lib;netapi32.lib;IPHLPAPI.Lib;Advapi32.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Programs\DCMTK\lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Programs\DCMTK_MD\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Link>
       <AdditionalDependencies>dcmdata.lib;oflog.lib;ws2_32.lib;netapi32.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Programs\DCMTK\lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Programs\DCMTK_MD\lib</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Programs\DCMTK\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Programs\DCMTK_MD\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ClCompile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <PreprocessorDefinitions>LIB4DICOM_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>LIB4DICOM_LIB;LIB4DICOM_LIBRARY
+;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>

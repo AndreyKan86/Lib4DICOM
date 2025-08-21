@@ -1,653 +1,374 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
-import QtQuick.Window 
-import QtQuick.Layouts
-import QtQuick.Dialogs
+import QtQuick.Layouts 1.15
 
 ApplicationWindow {
-    id: root
+    id: win
+    width: 720
+    height: 480
     visible: true
-    minimumWidth: 900
-    minimumHeight: 600
-    maximumWidth: 900
-    maximumHeight: 600
-    title: qsTr("Название программы")
+    title: "DICOM — пациенты"
 
-    //Переменные
-    property string patientID: ""
-    property string studyID: ""
-    property string seriesID: ""
-    property string patientWeightKG: ""
-    property string patientWeightG: ""
-    property string patientSex: ""
-    property string patinentAgeYear: ""
-    property string patientAgeMonth: ""
-    property string patinentAgeDay: ""
-    property string patientName: ""
-    property string patinentFamily: ""
-    property string patinentFatherName: ""
-    property string filePath: ""
-    property string patientBirthday: ""
+Connections {
+    target: win
+    onProceed: {
+        console.log("[QML] proceed:", payload)
+    }
+}
 
-    //Верхняя плашка
-    component TopLable: Rectangle {
-           height: parent.height /10 * 2
-           width: parent.width
-           gradient: Gradient {
-                GradientStop { position: 0.0; color: "#3a6186" }
-                GradientStop { position: 1.0; color: "#49253e" }
-           }
+    // Пользовательский сигнал: «идём дальше» с полезной нагрузкой
+    signal proceed(string payload)
 
-           radius: 2 
-           border.width: 0
-           Text {
-                 text: "Информация о пациенте"
-                 anchors.left: parent.left
-                 anchors.verticalCenter: parent.verticalCenter
-                 anchors.leftMargin: 10 
-                 color: "lightgrey"
-                 font.family: "Times New Roman"
-                 font.pixelSize: 18
-           }
+    // Состояние выбора
+    property bool  selectedIsNew: false      // выбрана ли строка «Новый пациент»
+    property int   selectedIndex: -1         // индекс выбранного пациента в модели (если не «новый»)
+
+    StackView {
+        id: stack
+        anchors.fill: parent
+        initialItem: startPage
     }
 
-    //Нижняя  плашка
-    component BottomLable: Rectangle {
-            height: parent.height /10
-            width: parent.width
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: "#3a6186" }
-                GradientStop { position: 1.0; color: "#49253e" }
-            }
-            radius: 2 
-            border.width: 0
-            Text {
-                 text: "Дополнительная информация"
-                 anchors.left: parent.left
-                 anchors.verticalCenter: parent.verticalCenter
-                 anchors.leftMargin: 10 
-                 color: "lightgrey"
-                 font.family: "Times New Roman"
-                 font.pixelSize: 18
-            }
-    }
-
-    //Файл, день рождения ID  кнопка пуска
-    component FileIdDate: Column {
-       width: parent.width
-       height: parent.height
-       //ID
-       Rectangle {
-            width: parent.width
-            height: parent.height / 3
-            color: "transparent" 
-
-            Rectangle {
-              width: 1              
-              height: parent.height * 3      
-              color: "black"    
-            }
-
-            Row {
-                spacing: 10
-                anchors.left: parent.left
-                anchors.leftMargin: 8
-                anchors.verticalCenter: parent.verticalCenter  
-                
-                //ID patient
-                Text {
-                    text: "ID пациента:"
-                    color: "lightgrey"
-                    font.family: "Times New Roman"
-                    font.pixelSize: 12
-                    height: 30
-                    width: 60
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                TextField {
-                    id: patientID
-                    width: 65
-                    height: 30
-                    placeholderText: ""
-                    verticalAlignment: Text.AlignVCenter
-
-                    onTextChanged: {
-                        let filtered = text.replace(/[^0-9]/g, "");
-                        if (filtered !== text) {
-                        text = filtered;
-                        }
-                        root.patientID = text
-                    }
-                }
-                
-                //ID study
-                Text {
-                    text: "ID исследования:"
-                    color: "lightgrey"
-                    font.family: "Times New Roman"
-                    font.pixelSize: 12
-                    height: 30
-                    width: 85
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                TextField {
-                    id: studyID
-                    width: 65
-                    height: 30
-                    placeholderText: ""
-                    verticalAlignment: Text.AlignVCenter
-
-                    onTextChanged: {
-                        let filtered = text.replace(/[^0-9]/g, "");
-                        if (filtered !== text) {
-                        text = filtered;
-                        }
-                        root.studyID = text
-                    }
-                }
-
-                //ID series
-                Text {
-                    text: "ID серии:"
-                    color: "lightgrey"
-                    font.family: "Times New Roman"
-                    font.pixelSize: 12
-                    height: 30
-                    width: 40
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                TextField {
-                    id: seriesID
-                    width: 65
-                    height: 30
-                    placeholderText: ""
-                    verticalAlignment: Text.AlignVCenter
-
-                    onTextChanged: {
-                        let filtered = text.replace(/[^0-9]/g, "");
-                        if (filtered !== text) {
-                        text = filtered;
-                        }
-                        root.studyUID = text
-                    }
+    Component {
+        id: startPage
+        Page {
+            Component.onCompleted: {
+                if (appLogic && appLogic.scanPatients) {
+                    console.log("[QML] auto-scan on page start")
+                    appLogic.scanPatients()
                 }
             }
-       }   
-        //Дата рождения
-       Rectangle {
-          width: parent.width
-          height: parent.height / 3
-          color: "transparent" 
-     
-                RowLayout  {
-                    spacing: 10
-                    anchors.left: parent.left
-                    anchors.leftMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    Text {
-                        text: "Дата рождения:"
-                        color: "lightgrey"
-                        font.family: "Times New Roman"
-                        font.pixelSize: 14
-                        width: 100
-                        height: 30
-                        verticalAlignment: Text.AlignVCenter
+            header: ToolBar {
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: 12
+
+                    Label {
+                        Layout.alignment: Qt.AlignVCenter
+                        text: patientsList.count === 0
+                              ? "Пациенты (нет пациентов)"
+                              : "Пациенты (" + patientsList.count + " найдено)"
+                        font.bold: true
                     }
+
+                    Item { Layout.fillWidth: true } // растяжка
                 }
-       }
-       //Выбор файла и кнопка старт
-       Rectangle {
-             width: parent.width
-             height: parent.height / 3
-             color: "transparent" 
-             Row {
-                 spacing: 15
-                 anchors.left: parent.left
-                 anchors.leftMargin: 8
-                 anchors.verticalCenter: parent.verticalCenter   
-
-                 Text {
-                      text: "Файл:"
-                      color: "lightgrey"
-                      font.family: "Times New Roman"
-                      font.pixelSize: 14
-                      height: 30
-                      width: 60
-                      verticalAlignment: Text.AlignVCenter
-                 }
-
-                TextField {
-                      id: filePathField
-                      width: 150
-                      height: 30
-                      readOnly: true
-                      text: fileName.selectedFile
-                      
-                }
-
-                Button {
-                        text: "Обзор"
-                        width: 90
-                        height: 30
-                        onClicked: fileName.open()
-                }
-
-
-                Button {
-                        text: "Приступить"
-                        width: 80
-                        height: 30
-                        onClicked: {  
-                            appLogic.dataTransfer(root.patientID, root.studyID, root.seriesID, root.filePath, root.patientName, root.patientFamily, root.patinetFatherName,
-                                                   root.patientSex, root.patientWeightKG,  root.patientWeightG,  
-                                                   root.patinentAgeYear, root.patientAgeMonth, root.patinentAgeDay, root.patientBirthday )
-                        }
-                }
-
-                FileDialog {
-                     id: fileName
-                     title: "Выберите файл"
-                     nameFilters: ["Все файлы (*)", "Текстовые файлы (*.txt)", "Изображения (*.png *.jpg)"]
-                     visible: false
-                     onAccepted: {
-                        root.filePath = fileName.selectedFile
-                     }
-                }
-             }
-       }
-    }
-
-    //Пол возраст вес
-    component AgeWeightSex: Column {
-       width: parent.width
-       height: parent.height
-        //Age
-       Rectangle {
-            width: parent.width
-            height: parent.height / 3
-            color: "transparent" 
-            //Horizontal divider
-            Rectangle {
-              width: 1              
-              height: parent.height * 3      
-              color: "black"    
             }
-            //Main component row
-            Row {
-                spacing: 10
-                anchors.left: parent.left
-                anchors.leftMargin: 8
-                anchors.verticalCenter: parent.verticalCenter  
 
-                //Age
-                Text {
-                    text: "Возраст:"
-                    color: "lightgrey"
-                    font.family: "Times New Roman"
-                    font.pixelSize: 16
-                    height: 30
-                    width: 60
-                    verticalAlignment: Text.AlignVCenter
-                }
-                    //Year
-                    TextField {
-                        id: year
-                        width: 40
-                        height: 30
-                        placeholderText: "лет"
-                        verticalAlignment: Text.AlignVCenter
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 8
 
-                        onTextChanged: {
-                            let filtered = text.replace(/[^0-9]/g, "");
-                            if (filtered !== text) {
-                            text = filtered;
-                            }
-                            root.patinentAgeYear  = text
-                        }
-                    }
-                    //Month
-                    TextField {
-                        id: month
-                        width: 40
-                        height: 30
-                        placeholderText: "мес."
-                        verticalAlignment: Text.AlignVCenter
+                // === Таблица ===
+                Rectangle {
+                    id: tableFrame
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    radius: 6
+                    border.width: 1
+                    border.color: "#bfc3c8"
+                    color: "white"
+                    clip: true
 
-                        onTextChanged: {
-                            let filtered = text.replace(/[^0-9]/g, "");
-                            if (filtered !== text) {
-                            text = filtered;
-                            }
-                            root.patientAgeMonth = text
-                        }
-                    }
-                    //Days
-                    TextField {
-                        id: day
-                        width: 40
-                        height: 30
-                        placeholderText: "дней"
-                        verticalAlignment: Text.AlignVCenter
+                    // размеры колонок/сетки
+                    property int yearW: 140
+                    property int sexW: 90
+                    property int sepW: 1
+                    property color gridColor: "#c7cbd1"
+                    property int nameW: width - yearW - sexW - 2*sepW
 
-                        onTextChanged: {
-                            let filtered = text.replace(/[^0-9]/g, "");
-                            if (filtered !== text) {
-                            text = filtered;
-                            }
-                            root.patientAgeDay = text
-                        }
-                    }
-            }
-       }   
-       //Weight
-       Rectangle {
-           width: parent.width
-           height: parent.height / 3
-           color: "transparent" 
-                Row {
-                     spacing: 10  
-                     anchors.left: parent.left
-                     anchors.leftMargin: 8
-                     anchors.verticalCenter: parent.verticalCenter   
-                    //Weight 
-                    Text {
-                         text: "Вес:"
-                         color: "lightgrey"
-                         font.family: "Times New Roman"
-                         font.pixelSize: 16
-                         width: 60
-                         height: 30
-                         verticalAlignment: Text.AlignVCenter
-                    }
-                    //Kg
-                    TextField {
-                        id: kg
-                        width: 40
-                        height: 30
-                        placeholderText: "кг"
-                        verticalAlignment: Text.AlignVCenter
-                            onTextChanged: {
-                                let filtered = text.replace(/[^0-9]/g, "");
-                                if (filtered !== text) {
-                                text = filtered;
+                    Column {
+                        width: parent.width
+                        height: parent.height
+                        spacing: 0
+
+                        // --- Шапка ---
+                        Rectangle {
+                            id: headerRow
+                            height: 36
+                            width: parent.width
+                            color: "#efefef"
+
+                            Row {
+                                anchors.fill: parent
+                                spacing: 0
+
+                                Rectangle {
+                                    width: tableFrame.nameW
+                                    height: parent.height
+                                    color: "transparent"
+                                    Label {
+                                        anchors.fill: parent
+                                        anchors.margins: 8
+                                        text: "ФИО"
+                                        verticalAlignment: Qt.AlignVCenter
+                                        color: "black"
+                                    }
                                 }
-                            root.patientWeightKG = text
-                            }
-                    }
-                    //Grann
-                    TextField {
-                        id: gramm
-                        width: 40
-                        height: 30
-                        placeholderText: "грамм"
-                        verticalAlignment: Text.AlignVCenter
-                            onTextChanged: {
-                                let filtered = text.replace(/[^0-9]/g, "");
-                                if (filtered !== text) {
-                                text = filtered;
+                                Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
+                                Rectangle {
+                                    width: tableFrame.yearW
+                                    height: parent.height
+                                    color: "transparent"
+                                    Label {
+                                        anchors.fill: parent
+                                        text: "Год рождения"
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Qt.AlignVCenter
+                                        color: "black"
+                                    }
                                 }
-                            root.patinetnWeightGramm = text
+                                Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
+                                Rectangle {
+                                    width: tableFrame.sexW
+                                    height: parent.height
+                                    color: "transparent"
+                                    Label {
+                                        anchors.fill: parent
+                                        text: "Пол"
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Qt.AlignVCenter
+                                        color: "black"
+                                    }
+                                }
                             }
-                    }
-                } 
-        }
-        //Sex
-        Rectangle {
-            width: parent.width
-            height: parent.height / 3
-            color: "transparent" 
-              Row {
-                 spacing: 10
-                 anchors.left: parent.left
-                 anchors.leftMargin: 8
-                 anchors.verticalCenter: parent.verticalCenter   
 
-                 Text {
-                     text: "Пол:"
-                     color: "lightgrey"
-                     font.family: "Times New Roman"
-                     font.pixelSize: 16
-                     height: 30
-                     width: 60
-                     verticalAlignment: Text.AlignVCenter
-                 }
-         
-                 ComboBox {
-                      id: sex
-                      width: 100
-                      height: 30
-                      model: ListModel {
-                          ListElement { label: "Мужской"; value: "M" }
-                          ListElement { label: "Женский"; value: "F" }
-                      }
-                      textRole: "label"
-
-
-                      background: Rectangle {
-                          color: "#323232"
-                          radius: 4
-                          border.color: "#323232"
-                      }  
-
-                      onCurrentIndexChanged: {
-                          root.patientSex = model.get(currentIndex).value
-                      }
-                 }
-              }
-        }
-    }
-
-    //Фамилия имя отчество
-    component FIO: Column {
-       width: parent.width
-       height: parent.height
-       //Family
-       Rectangle {
-            width: parent.width
-            height: parent.height / 3
-            color: "transparent" 
-            Row {
-                spacing: 10
-                anchors.left: parent.left
-                anchors.leftMargin: 10
-                anchors.verticalCenter: parent.verticalCenter   
-                //Text
-                Text {
-                    text: "Фамилия:"
-                    color: "lightgrey"
-                    font.family: "Times New Roman"
-                    font.pixelSize: 16
-                    height: 30
-                    width: 60
-                    verticalAlignment: Text.AlignVCenter
-                }
-                //Text field
-                TextField {
-                    id: family
-                    width: 130
-                    height: 30
-                    placeholderText: "Введите фамилию"
-                    verticalAlignment: Text.AlignVCenter
-                    font.family: "Arial"
-                    onTextChanged: {
-                        let filtered = text.replace(/[^а-яА-Яa-zA-Z\s\-]/g, "");
-                        if (filtered !== text) {
-                            text = filtered;
+                            // одна нижняя линия под шапкой
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                height: 1
+                                color: tableFrame.gridColor
+                            }
                         }
-                        root.patientFamily = text
-                    }
-                }
-            }
-       }   
-       //Name
-       Rectangle {
-           width: parent.width
-           height: parent.height / 3
-           color: "transparent" 
-                
-               Row {
-                         spacing: 10  
-                         anchors.left: parent.left
-                         anchors.leftMargin: 10
-                         anchors.verticalCenter: parent.verticalCenter   
-                         //Text
-                         Text {
-                             text: "Имя:"
-                             color: "lightgrey"
-                             font.family: "Times New Roman"
-                             font.pixelSize: 16
-                             width: 60
-                             height: 30
-                             verticalAlignment: Text.AlignVCenter
-                         }
-                         //Text field
-                         TextField {
-                                 id: name
-                                 width: 130
-                                 height: 30
-                                 placeholderText: "Введите имя"
-                                 font.family: "Arial"
-                                 verticalAlignment: Text.AlignVCenter
-                                 onTextChanged: {
-                                        let filtered = text.replace(/[^а-яА-Яa-zA-Z\s\-]/g, "");
-                                        if (filtered !== text) {
-                                        text = filtered;
+
+                        // --- Данные ---
+                        ScrollView {
+                            id: sv
+                            width: parent.width
+                            height: parent.height - headerRow.height
+                            clip: true
+                            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                            ListView {
+                                id: patientsList
+                                width: parent.width
+                                model: appLogic ? appLogic.patientModel : null
+                                boundsBehavior: Flickable.StopAtBounds
+                                clip: true
+                                interactive: true
+
+                                // Хедер — строка «Новый пациент»
+                                header: Rectangle {
+                                    width: patientsList.width
+                                    height: 36
+                                    color: selectedIsNew ? "#e6f2ff" : "white"
+
+                                    Row {
+                                        anchors.fill: parent
+                                        spacing: 0
+
+                                        // ФИО (Новый пациент)
+                                        Rectangle {
+                                            width: tableFrame.nameW
+                                            height: parent.height
+                                            color: "transparent"
+                                            Text {
+                                                anchors.fill: parent
+                                                anchors.margins: 8
+                                                text: "Новый пациент"
+                                                elide: Text.ElideRight
+                                                verticalAlignment: Text.AlignVCenter
+                                                color: "black"
+                                                font.bold: true
+                                            }
                                         }
-                                        root.patientName = text
-                                 }
-                         }
-               }
-       }
-       //Father Name
-       Rectangle {
-        width: parent.width
-        height: parent.height / 3
-        color: "transparent" 
-          Row {
-             spacing: 10
-             anchors.left: parent.left
-             anchors.leftMargin: 10
-             anchors.verticalCenter: parent.verticalCenter   // ⬅️ добавлено
+                                        // вертикальный разделитель
+                                        Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
 
-             Text {
-                 text: "Отчество:"
-                 color: "lightgrey"
-                 font.family: "Times New Roman"
-                 font.pixelSize: 16
-                 height: 30
-                 width: 60
-                 verticalAlignment: Text.AlignVCenter
-             }
+                                        // Год рождения (пусто/тире)
+                                        Rectangle {
+                                            width: tableFrame.yearW
+                                            height: parent.height
+                                            color: "transparent"
+                                            Text {
+                                                anchors.fill: parent
+                                                text: "-"
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                                color: "black"
+                                            }
+                                        }
+                                        // вертикальный разделитель
+                                        Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
 
-             TextField {
-                id: fatherName
-                width: 130
-                height: 30
-                placeholderText: "Введите отчество"
-                verticalAlignment: Text.AlignVCenter
-                    onTextChanged: {
-                        let filtered = text.replace(/[^а-яА-Яa-zA-Z\s\-]/g, "");
-                        if (filtered !== text) {
-                        text = filtered;
+                                        // Пол (пусто/тире)
+                                        Rectangle {
+                                            width: tableFrame.sexW
+                                            height: parent.height
+                                            color: "transparent"
+                                            Text {
+                                                anchors.fill: parent
+                                                text: "-"
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                                color: "black"
+                                            }
+                                        }
+                                    }
+
+                                    // Горизонтальная линия
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        height: 1
+                                        color: tableFrame.gridColor
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: {
+                                            selectedIsNew = true
+                                            selectedIndex = -1
+                                            patientsList.currentIndex = -1
+                                        }
+                                    }
+                                }
+
+                                // Делегат обычных пациентов
+                                delegate: Rectangle {
+                                    height: 36
+                                    width: patientsList.width
+                                    color: (selectedIsNew ? false : ListView.isCurrentItem) ? "#e6f2ff" : "white"
+
+                                    Row {
+                                        anchors.fill: parent
+                                        spacing: 0
+
+                                        // ФИО
+                                        Rectangle {
+                                            width: tableFrame.nameW
+                                            height: parent.height
+                                            color: "transparent"
+                                            Text {
+                                                anchors.fill: parent
+                                                anchors.margins: 8
+                                                text: fullName
+                                                elide: Text.ElideRight
+                                                verticalAlignment: Text.AlignVCenter
+                                                color: "black"
+                                            }
+                                        }
+                                        Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
+
+                                        // Год рождения
+                                        Rectangle {
+                                            width: tableFrame.yearW
+                                            height: parent.height
+                                            color: "transparent"
+                                            Text {
+                                                anchors.fill: parent
+                                                text: birthYear
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                                color: "black"
+                                            }
+                                        }
+                                        Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
+
+                                        // Пол
+                                        Rectangle {
+                                            width: tableFrame.sexW
+                                            height: parent.height
+                                            color: "transparent"
+                                            Text {
+                                                anchors.fill: parent
+                                                text: sex
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                                color: "black"
+                                            }
+                                        }
+                                    }
+
+                                    // Горизонтальная линия
+                                    Rectangle {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        height: 1
+                                        color: tableFrame.gridColor
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: {
+                                            selectedIsNew = false
+                                            patientsList.currentIndex = index
+                                            selectedIndex = index
+                                        }
+                                    }
+                                }
+                            }
                         }
-                        root.patinetFatherName = text
                     }
-             }
-          }
-       }
+                }
+
+                // нижняя панель с серой линией сверху и кнопкой
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 1
+                        color: "#d9dce1" // светло-серая линия
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignRight
+                        Layout.topMargin: 8
+
+                        Button {
+                            text: "Далее"
+                            onClicked: {
+                                if (selectedIsNew) {
+                                    // Открываем страницу создания/ввода нового пациента
+                                    stack.push(nextPage)
+                                } else {
+                                    // Отправляем сигнал и закрываем окно
+                                    win.proceed("START")
+                                    win.close()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    //Первый верхний контейнер
-    component TopRow: Item {
-            width: parent.width 
-            height: parent.height * 0.8
-            anchors.topMargin: parent.height * 0.2
-            anchors.top: parent.top
-            anchors.horizontalCenter: parent.horizontalCenter
+    Component {
+        id: nextPage
+        Page {
+            header: ToolBar {
+                RowLayout {
+                    anchors.fill: parent
+                    ToolButton { text: "←"; onClicked: stack.pop() }
+                    Label { text: "Следующее окно"; Layout.alignment: Qt.AlignVCenter }
+                }
+            }
 
-            Row {
+            ColumnLayout {
                 anchors.fill: parent
-                Rectangle {
-                    width: parent.width * 0.24
-                    height: parent.height
-                    color: "transparent"
-                    FIO{}
-                }
-
-                Rectangle {
-                    width: parent.width * 0.25
-                    height: parent.height
-                    color: "transparent"
-                    AgeWeightSex{}
-                }
-
-                Rectangle {
-                    width: parent.width * 0.52
-                    height: parent.height
-                    color: "transparent"
-
-                    FileIdDate{}
-                }
+                anchors.margins: 16
+                spacing: 12
+                Label { text: "Здесь будет интерфейс создания нового пациента."; Layout.fillWidth: true }
             }
-    }
-
-    //Верхний контейнер
-    component TopPart: Rectangle {
-            height: parent.height / 3
-            width: parent.width
-            color: "transparent"
-            border.width: 0
-
-            TopLable{}  //Верхняя надпись
-
-            TopRow{}    //Нижняя надпись
-
-            //Разделительная линия 
-            Rectangle {
-                height: 1
-                width: parent.width
-                color: "black"
-                anchors.bottom: parent.bottom
-                anchors.left: parent.left
-            }
-    }
-
-    // Нижний контейнер
-    component BottomPart: Rectangle {
-            height: parent.height * 2 / 3
-            width: parent.width
-            color: "transparent"
-            border.width: 0
-
-            BottomLable{}
-
-            Text {
-                anchors.centerIn: parent
-                color: "white"
-                font.pixelSize: 20
-                text: "Место для вкладок"
-            }
-    }
-
-    // Основной интерфейс
-    Rectangle {
-            anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: "#3a6186" }
-                GradientStop { position: 1.0; color: "#49253e" }
-            }
-
-            Column {
-                anchors.fill: parent
-
-                // Используем TopPart
-                TopPart {}
-
-                // Используем BottomPart
-                BottomPart {}
-            }
+        }
     }
 }

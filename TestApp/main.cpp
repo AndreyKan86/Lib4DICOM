@@ -4,8 +4,23 @@
 #include <QIcon>
 #include "lib4dicom.h"
 
+#ifdef _MSC_VER
+#include <crtdbg.h>   // <- обязательно для _Crt*
+#endif
+
+
 int main(int argc, char* argv[])
 {
+#ifdef _DEBUG
+    // Проверять кучу на каждом alloc/free + дамп утечек при выходе
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF
+        | _CRTDBG_LEAK_CHECK_DF
+        | _CRTDBG_CHECK_ALWAYS_DF);
+    // вывод ошибок в Output/Debug
+    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
+    // точечная проверка где надо:
+    _CrtCheckMemory();
+#endif
     QApplication app(argc, argv); 
 
     app.setWindowIcon(QIcon(":/qml/icon.png"));  
