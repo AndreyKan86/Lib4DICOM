@@ -73,7 +73,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\Programs\DCMTK\lib;C:\Files\Work\Danil\Lib4DICOM\x64\Debug</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Programs\DCMTK_MD\lib;C:\Files\Work\Danil\Lib4DICOM\x64\Debug</AdditionalLibraryDirectories>
       <AdditionalDependencies>oficonv.lib;ofstd.lib;oflog.lib;dcmdata.lib;ws2_32.lib;netapi32.lib;Lib4DICOM.lib;IPHLPAPI.Lib;Advapi32.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

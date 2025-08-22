@@ -29,9 +29,6 @@
     <ClInclude Include="lib4dicom_global.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClCompile Include="lib4dicom.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -55,5 +52,10 @@
     <QtMoc Include="lib4dicom.h">
       <Filter>Header Files</Filter>
     </QtMoc>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="lib4dicom.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

@@ -1,9 +1,13 @@
-#pragma once
+п»ї#pragma once
 
 #include <QAbstractListModel>
 #include <QString>
 #include <QList>
-#include "lib4dicom_global.h"   // подключаем макрос экспорта
+#include <QVector>     
+#include <QImage>
+#include <QVariant>
+
+#include "lib4dicom_global.h"
 
 class LIB4DICOM_EXPORT Lib4DICOM : public QAbstractListModel {
     Q_OBJECT
@@ -11,19 +15,46 @@ class LIB4DICOM_EXPORT Lib4DICOM : public QAbstractListModel {
 
 public:
     enum Roles { FullNameRole = Qt::UserRole + 1, BirthYearRole, SexRole };
-
     explicit Lib4DICOM(QObject* parent = nullptr);
 
-    // --- QAbstractListModel ---
+
+
+
+    // QAbstractListModel
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    // --- Доступ для QML ---
+    // QML API
     QAbstractItemModel* patientModel();
-
-    // --- Метод парсинга пациентов (вызывается из QML) ---
     Q_INVOKABLE void scanPatients();
+    Q_INVOKABLE void logSelectedFileAndPatient(const QString& filePath,
+        const QString& fullName,
+        const QString& birthYear,
+        const QString& sex);
+
+    Q_INVOKABLE QVariantMap makePatientFromStrings(const QString& fullName,
+        const QString& birthInput,
+        const QString& sexInput,
+        const QString& patientID);
+
+    // РЎС‚Р°СЂР°СЏ РІРµСЂСЃРёСЏ вЂ” РѕСЃС‚Р°РІР»СЏРµРј РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё СЃ QML
+    Q_INVOKABLE QImage loadImageFromFile(const QString& localPath);
+
+    // вњ… РќРѕРІР°СЏ РІРµСЂСЃРёСЏ вЂ” РІРѕР·РІСЂР°С‰Р°РµС‚ РІРµРєС‚РѕСЂ, РІРЅСѓС‚СЂРё РєРѕС‚РѕСЂРѕРіРѕ РѕРґРёРЅ QImage
+    Q_INVOKABLE QVector<QImage> loadImageVectorFromFile(const QString& localPath);
+
+    Q_INVOKABLE QString ensurePatientFolder(const QString& fullName,
+        const QString& birthYearNormalized);
+    Q_INVOKABLE QVariantMap createStudyForNewPatient(const QString& fullName,
+        const QString& birthYearNormalized,
+        const QString& patientID);
+
+    Q_INVOKABLE QVariantMap saveImagesAsDicom(const QVector<QImage>& images,
+        const QString& outFolder,
+        const QString& patientID,
+        const QString& seriesName,
+        const QString& studyUID);
 
 signals:
     void patientModelChanged();
@@ -33,6 +64,16 @@ private:
         QString fullName;
         QString birthYear;
         QString sex;
+        QString patientID;
     };
+
+    static QString normalizeBirthYear(const QString& birthInput);
+    static QString normalizeSex(const QString& sexInput);
+    static QString normalizeID(const QString& idInput);
+    static QString makeSafeFolderName(const QString& s);
+    static QString generateDicomUID();
+
+    static QImage  toRgb888(const QImage& src); // helper
+
     QList<Patient> m_patients;
 };

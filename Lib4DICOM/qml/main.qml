@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Dialogs 
 
 ApplicationWindow {
     id: win
@@ -228,14 +229,33 @@ Connections {
                                         color: tableFrame.gridColor
                                     }
 
+
                                     MouseArea {
                                         anchors.fill: parent
+                                        acceptedButtons: Qt.LeftButton
+                                        hoverEnabled: true
+     
                                         onClicked: {
+                                            // просто выделяем "Новый пациент"
                                             selectedIsNew = true
                                             selectedIndex = -1
                                             patientsList.currentIndex = -1
                                         }
+
+                                        onDoubleClicked: {
+                                            // мгновенно переходим к форме создания пациента
+                                            selectedIsNew = true
+                                            selectedIndex = -1
+                                            patientsList.currentIndex = -1
+                                            stack.push(nextPage)
+                                        }
+
+                                        Keys.onEnterPressed: onDoubleClicked()
+                                        Keys.onReturnPressed: onDoubleClicked()
                                     }
+
+
+
                                 }
 
                                 // Делегат обычных пациентов
@@ -305,10 +325,25 @@ Connections {
 
                                     MouseArea {
                                         anchors.fill: parent
+                                        hoverEnabled: true
+                                        acceptedButtons: Qt.LeftButton
                                         onClicked: {
+                                            // обычный одинарный клик — просто выделяем строку
                                             selectedIsNew = false
                                             patientsList.currentIndex = index
                                             selectedIndex = index
+                                        }
+                                        onDoubleClicked: {
+                                            // двойной клик — выбираем пациента и завершаем (как "Далее" для существующего)
+                                            selectedIsNew = false
+                                            patientsList.currentIndex = index
+                                            selectedIndex = index
+
+                                            // при необходимости — шлём сигнал наверх (как у тебя было)
+                                            win.proceed("START")
+
+                                            // закрываем окно
+                                            win.close()
                                         }
                                     }
                                 }
@@ -342,7 +377,8 @@ Connections {
                                 } else {
                                     // Отправляем сигнал и закрываем окно
                                     win.proceed("START")
-                                    win.close()
+                                    stack.push(nextPage)
+                                    //win.close()
                                 }
                             }
                         }
@@ -355,6 +391,8 @@ Connections {
     Component {
         id: nextPage
         Page {
+            id: pageNew
+
             header: ToolBar {
                 RowLayout {
                     anchors.fill: parent
@@ -363,12 +401,180 @@ Connections {
                 }
             }
 
+            // локальные данные пациента (ВСЕ объявлены на Page!)
+            property string pName: ""
+            property string pBirth: ""
+            property string pSex: ""
+            property string pFile: ""
+            property string pPatientID: ""
+
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 16
                 spacing: 12
-                Label { text: "Здесь будет интерфейс создания нового пациента."; Layout.fillWidth: true }
+
+                GroupBox {
+                    title: "Данные пациента"
+                    Layout.fillWidth: true
+
+                    GridLayout {
+                        columns: 2
+                        rowSpacing: 8
+                        columnSpacing: 12
+                        Layout.fillWidth: true
+
+                        Label { text: "Имя (ФИО):" }
+                        TextField {
+                            id: nameField
+                            Layout.fillWidth: true
+                            placeholderText: "Иванов Иван Иванович"
+                            text: pageNew.pName
+                            onTextChanged: pageNew.pName = text
+                        }
+
+                        Label { text: "Дата рождения:" }
+                        TextField {
+                            id: birthField
+                            Layout.fillWidth: true
+                            placeholderText: "YYYY или YYYYMMDD"
+                            inputMethodHints: Qt.ImhPreferNumbers
+                            text: pageNew.pBirth
+                            onTextChanged: pageNew.pBirth = text
+                        }
+
+                        Label { text: "Пол:" }
+                        ComboBox {
+                            id: sexCombo
+                            Layout.fillWidth: true
+                            textRole: "text"
+                            valueRole: "value"
+                            model: [
+                                { text: "Мужской", value: "M" },
+                                { text: "Женский", value: "F" },
+                                { text: "Другое/не указано", value: "O" }
+                            ]
+                            onCurrentIndexChanged: pageNew.pSex = currentValue
+                            Component.onCompleted: pageNew.pSex = currentValue
+                        }
+
+                        // --- Новые поля ---
+                        Label { text: "ID пациента:" }
+                        TextField {
+                            id: patientIdField
+                            Layout.fillWidth: true
+                            placeholderText: "Напр.: P12345"
+                            text: pageNew.pPatientID
+                            onTextChanged: pageNew.pPatientID = text
+                        }
+                    }
+                }
+
+                // ===== Выбор файла =====
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    TextField {
+                        id: filePathField
+                        Layout.fillWidth: true
+                        readOnly: true
+                        placeholderText: "Файл не выбран"
+                        text: pageNew.pFile
+                    }
+
+                    Button {
+                        text: "Обзор…"
+                        onClicked: fileDialog.open()
+                    }
+                }
+
+                FileDialog {
+                    id: fileDialog
+                    title: "Выберите файл изображения"
+                    fileMode: FileDialog.OpenFile
+                    nameFilters: [ "Изображения (*.bmp *.jpeg *.jpg *.png)", "Все файлы (*)" ]
+                    onAccepted: {
+                        const urlStr = selectedFile.toString()
+                        const localPath = decodeURIComponent(urlStr.replace(/^file:\/+/, ""))
+
+                        pageNew.pFile = localPath
+                        filePathField.text = localPath
+
+                        console.log("[FileDialog] URL:", urlStr)
+                        console.log("[FileDialog] Local path:", localPath)
+
+                        if (appLogic && appLogic.logSelectedFileAndPatient) {
+                            appLogic.logSelectedFileAndPatient(
+                                localPath,
+                                pageNew.pName,
+                                pageNew.pBirth,
+                                pageNew.pSex
+                            )
+                        } else {
+                            console.warn("appLogic.logSelectedFileAndPatient не найден")
+                        }
+                    }
+                    onRejected: console.log("[FileDialog] отменено пользователем")
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignRight
+                    Layout.topMargin: 8
+
+Button {
+    text: "Далее"
+    onClicked: {
+        let patient = null
+        if (appLogic && appLogic.makePatientFromStrings) {
+            patient = appLogic.makePatientFromStrings(
+                pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
+            )
+            console.log("[QML] Patient ->",
+                        patient.fullName, patient.birthYear, patient.sex, patient.patientID)
+        } else {
+            console.warn("appLogic.makePatientFromStrings не найден")
+        }
+
+        if (win.selectedIsNew && patient && appLogic && appLogic.createStudyForNewPatient) {
+            const res = appLogic.createStudyForNewPatient(
+                patient.fullName, patient.birthYear, patient.patientID
+            )
+            if (res && res.studyFolder) {
+                console.log("[QML] Study created:",
+                            "\n  patientFolder:", res.patientFolder,
+                            "\n  studyFolder:",   res.studyFolder,
+                            "\n  studyName:",     res.studyName,
+                            "\n  studyUID:",      res.studyUID)
+            } else {
+                console.warn("[QML] Failed to create study folder")
+            }
+        }
+
+        if (appLogic && appLogic.loadImageFromFile && pageNew.pFile.length > 0) {
+            const img = appLogic.loadImageFromFile(pageNew.pFile)
+            console.log("[QML] Loaded image dimensions:", img.width, "x", img.height)
+        }
+
+        pageNew.pName = ""
+        pageNew.pBirth = ""
+        pageNew.pSex = sexCombo.currentValue
+        pageNew.pFile = ""
+        pageNew.pPatientID = ""
+
+        win.close()
+    }
+}
+
+
+
+
+
+                }
             }
         }
     }
+
+
+
 }
