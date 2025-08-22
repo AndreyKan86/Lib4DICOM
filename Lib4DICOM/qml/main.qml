@@ -522,51 +522,74 @@ Connections {
                     Layout.alignment: Qt.AlignRight
                     Layout.topMargin: 8
 
-Button {
-    text: "Далее"
-    onClicked: {
-        let patient = null
-        if (appLogic && appLogic.makePatientFromStrings) {
-            patient = appLogic.makePatientFromStrings(
-                pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
-            )
-            console.log("[QML] Patient ->",
-                        patient.fullName, patient.birthYear, patient.sex, patient.patientID)
-        } else {
-            console.warn("appLogic.makePatientFromStrings не найден")
-        }
-
-        if (win.selectedIsNew && patient && appLogic && appLogic.createStudyForNewPatient) {
-            const res = appLogic.createStudyForNewPatient(
-                patient.fullName, patient.birthYear, patient.patientID
-            )
-            if (res && res.studyFolder) {
-                console.log("[QML] Study created:",
-                            "\n  patientFolder:", res.patientFolder,
-                            "\n  studyFolder:",   res.studyFolder,
-                            "\n  studyName:",     res.studyName,
-                            "\n  studyUID:",      res.studyUID)
-            } else {
-                console.warn("[QML] Failed to create study folder")
-            }
-        }
-
-        if (appLogic && appLogic.loadImageFromFile && pageNew.pFile.length > 0) {
-            const img = appLogic.loadImageFromFile(pageNew.pFile)
-            console.log("[QML] Loaded image dimensions:", img.width, "x", img.height)
-        }
-
-        pageNew.pName = ""
-        pageNew.pBirth = ""
-        pageNew.pSex = sexCombo.currentValue
-        pageNew.pFile = ""
-        pageNew.pPatientID = ""
-
-        win.close()
-    }
-}
 
 
+                    Button {
+                        text: "Далее"
+                        onClicked: {
+                            // 1) Собираем данные пациента
+                            let patient = null
+                            if (appLogic && appLogic.makePatientFromStrings) {
+                                patient = appLogic.makePatientFromStrings(
+                                    pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
+                                )
+                            } else {
+                                console.warn("appLogic.makePatientFromStrings не найден")
+                            }
+
+                            // 2) Создаём исследование для нового пациента
+                            let study = null
+                            if (win.selectedIsNew && patient && appLogic && appLogic.createStudyForNewPatient) {
+                                study = appLogic.createStudyForNewPatient(
+                                    patient.fullName, patient.birthYear, patient.patientID
+                                )
+                                if (!study || !study.studyFolder) {
+                                    console.warn("[QML] Failed to create study folder")
+                                    return
+                                }
+
+                                // 2.1) Создаём stub DICOM в корне папки пациента (демография)
+                                if (appLogic && appLogic.createPatientStubDicom && study.patientFolder) {
+                                    const stub = appLogic.createPatientStubDicom(
+                                        study.patientFolder,            // корневой каталог пациента
+                                        patient.patientID,
+                                        patient.fullName,
+                                        patient.birthYear,              // "YYYY" или "YYYYMMDD"
+                                        patient.sex                     // "M"/"F"/"O"
+                                    )
+                                    if (!stub.ok) console.warn("[QML] Stub DICOM failed:", stub.error)
+                                    else          console.log("[QML] Stub DICOM created:", stub.path)
+                                } else {
+                                    console.warn("[QML] createPatientStubDicom не найден или нет patientFolder")
+                                }
+                            }
+
+                            // 3) Файл -> QVector<QImage> -> DICOM (всё внутри C++)
+                            if (pageNew.pFile && pageNew.pFile.length > 0 && study &&
+                                appLogic && appLogic.convertAndSaveImageAsDicom) {
+
+                                const res = appLogic.convertAndSaveImageAsDicom(
+                                  pageNew.pFile,
+                                  study.studyFolder,
+                                  patient.patientID,
+                                  "SER01",
+                                  study.studyUID,
+                                  patient.fullName,
+                                  patient.birthYear, // запишется как DA "YYYY" или "YYYYMMDD"
+                                  patient.sex        // "M"/"F"/"O"
+                                )
+                                console.log("[QML] DICOM save:", JSON.stringify(res))
+                            }
+
+                            // 4) Очистка и закрытие
+                            pageNew.pName = ""
+                            pageNew.pBirth = ""
+                            pageNew.pSex = sexCombo.currentValue
+                            pageNew.pFile = ""
+                            pageNew.pPatientID = ""
+                            win.close()
+                        }
+                    }
 
 
 

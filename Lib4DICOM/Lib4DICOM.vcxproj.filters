@@ -49,13 +49,13 @@
     </QtRcc>
   </ItemGroup>
   <ItemGroup>
-    <QtMoc Include="lib4dicom.h">
-      <Filter>Header Files</Filter>
-    </QtMoc>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="lib4dicom.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="lib4dicom.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
   </ItemGroup>
 </Project>
