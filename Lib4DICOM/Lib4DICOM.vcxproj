@@ -37,7 +37,7 @@
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
     <QtInstall>Qt 6.8.3</QtInstall>
-    <QtModules>core;gui;qml;quickdialogs2;quicklayouts</QtModules>
+    <QtModules>core;gui;qml;quick;quickdialogs2;quicklayouts</QtModules>
     <QtBuildConfig>debug</QtBuildConfig>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="QtSettings">

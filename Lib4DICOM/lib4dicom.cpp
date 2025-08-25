@@ -348,64 +348,88 @@ void Lib4DICOM::scanPatients() {
         root.mkpath(".");
 
     const QStringList nameFilters = { "*.dcm", "*.DCM" };
-    const QFileInfoList files = root.entryInfoList(
-        nameFilters, QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
 
-    const QFileInfoList dirs = root.entryInfoList(
-        QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    // Соберём все .dcm в /patients и всех подкаталогах первого уровня
+    QFileInfoList files = root.entryInfoList(nameFilters, QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    const QFileInfoList dirs = root.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    for (const QFileInfo& d : dirs) {
+        QDir sub(d.absoluteFilePath());
+        const QFileInfoList subFiles = sub.entryInfoList(nameFilters, QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+        files.append(subFiles);
+    }
 
-    auto processFile = [&](const QString& path) {
-        const QByteArray native = QFile::encodeName(path);
+    auto patientFolderOf = [](const QString& filePath) -> QString {
+        QFileInfo fi(filePath);
+        QDir d = fi.dir();
+        // эвристика: если текущая папка похожа на study (ID_YYYYMMDD...), берём родителя
+        if (d.dirName().contains('_'))
+            d.cdUp();
+        return d.absolutePath();
+        };
+
+    QHash<QString, Patient> uniq;  // ключ -> Patient
+    auto makeKey = [](const Patient& p, const QString& fallbackFolder) -> QString {
+        const QString pid = p.patientID.trimmed();
+        if (!pid.isEmpty() && pid != "--")
+            return "pid:" + pid;
+        // если нет ID — склеим по демографии
+        return QString("pn:%1|by:%2|sx:%3|pf:%4")
+            .arg(p.fullName.isEmpty() ? "--" : p.fullName)
+            .arg(p.birthYear.isEmpty() ? "--" : p.birthYear)
+            .arg(p.sex.isEmpty() ? "--" : p.sex)
+            .arg(fallbackFolder);
+        };
+
+    for (const QFileInfo& fi : files) {
+        const QString path = fi.absoluteFilePath();
+
         DcmFileFormat ff;
-        if (!ff.loadFile(native.constData()).good())
-            return;
+        if (!ff.loadFile(QFile::encodeName(path).constData()).good())
+            continue;
 
         DcmDataset* ds = ff.getDataset();
-        Patient p;
-        OFString v;
-        OFString cs; // SpecificCharacterSet (может отсутствовать)
-
-        // Прочитаем SpecificCharacterSet (если есть)
+        OFString v, cs;
         ds->findAndGetOFString(DCM_SpecificCharacterSet, cs);
 
-        // PatientName
+        Patient p;
+        // Name
         if (ds->findAndGetOFString(DCM_PatientName, v).good())
             p.fullName = decodeDicomText(v, cs).replace("^", " ");
         else
             p.fullName = "--";
-
-        // PatientBirthDate -> берём только год
-        if (ds->findAndGetOFString(DCM_PatientBirthDate, v).good() && v.length() >= 4) {
-            const QString da = decodeDicomText(v, cs);
-            p.birthYear = da.left(4);
-        }
-        else {
+        // Birth (год)
+        if (ds->findAndGetOFString(DCM_PatientBirthDate, v).good() && v.length() >= 4)
+            p.birthYear = decodeDicomText(v, cs).left(4);
+        else
             p.birthYear = "--";
-        }
-
-        // PatientSex
+        // Sex
         if (ds->findAndGetOFString(DCM_PatientSex, v).good())
             p.sex = decodeDicomText(v, cs);
         else
             p.sex = "--";
+        // PatientID
+        if (ds->findAndGetOFString(DCM_PatientID, v).good())
+            p.patientID = decodeDicomText(v, cs);
+        else
+            p.patientID = "--";
 
-        m_patients.push_back(p);
-        };
+        p.sourceFilePath = path;
+        const QString pf = patientFolderOf(path);
+        const QString key = makeKey(p, pf);
 
-    for (const QFileInfo& f : files)
-        processFile(f.absoluteFilePath());
-
-    for (const QFileInfo& d : dirs) {
-        QDir sub(d.absoluteFilePath());
-        const QFileInfoList subFiles = sub.entryInfoList(
-            nameFilters, QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
-        for (const QFileInfo& f : subFiles)
-            processFile(f.absoluteFilePath());
+        // добавляем только первый раз; при желании можно обновлять p.dcmPath на stub, если встретился
+        if (!uniq.contains(key)) {
+            uniq.insert(key, p);
+        }
     }
+
+    // Переносим в модель
+    m_patients = uniq.values();
 
     endResetModel();
     emit patientModelChanged();
 }
+
 
 // ---------------- Stub DICOM в корне папки пациента ----------------
 QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder,
@@ -911,4 +935,175 @@ QVariantMap Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images,
     if (saved != images.size())
         result["error"] = QString("saved %1 of %2").arg(saved).arg(images.size());
     return result;
+}
+
+QVariantMap Lib4DICOM::getPatientDemographics(int index) const {
+    QVariantMap out;
+    if (index < 0 || index >= m_patients.size()) {
+        out["ok"] = false; out["error"] = "index out of range"; return out;
+    }
+    const auto& p = m_patients.at(index);
+    out["ok"] = true;
+    out["fullName"] = p.fullName;
+    out["birthYear"] = p.birthYear;
+    out["sex"] = p.sex;
+    out["patientID"] = p.patientID;
+
+    // Определяем папку пациента: если файл лежит в подкаталоге исследования — поднимаемся на уровень выше
+    QFileInfo fi(p.sourceFilePath);
+    QDir d = fi.dir();
+    QString patientFolder = d.absolutePath();
+    // Если в текущей папке есть много DICOMов и имя файла не похоже на «root-level», можно при желании cdUp()
+    // Простая и надёжная эвристика:
+    if (d.dirName().contains('_')) { // чаще study-папка типа P1234_YYYYMMDD
+        d.cdUp();
+        patientFolder = d.absolutePath();
+    }
+    out["patientFolder"] = patientFolder;
+    return out;
+}
+
+
+QVariantMap Lib4DICOM::createStudyInPatientFolder(const QString& patientFolder,
+    const QString& patientID) {
+    QVariantMap out;
+    if (patientFolder.isEmpty() || !QDir(patientFolder).exists()) {
+        out["ok"] = false; out["error"] = "patient folder does not exist"; return out;
+    }
+
+    const QString safeID = normalizeID(patientID);
+    const QString dateStr = QDate::currentDate().toString("yyyyMMdd");
+    const QString base = safeID + "_" + dateStr;
+
+    QString studyFolder = QDir(patientFolder).absoluteFilePath(base);
+    int n = 2;
+    while (QDir(studyFolder).exists() && n <= 9999) {
+        studyFolder = QDir(patientFolder).absoluteFilePath(base + "_" + QString::number(n++));
+    }
+    if (!QDir().mkpath(studyFolder)) {
+        out["ok"] = false; out["error"] = "failed to create study folder"; return out;
+    }
+
+    out["ok"] = true;
+    out["patientFolder"] = patientFolder;
+    out["studyFolder"] = studyFolder;
+    out["studyName"] = QFileInfo(studyFolder).fileName();
+    out["studyUID"] = generateDicomUID();
+    return out;
+}
+
+
+QVariantMap Lib4DICOM::findPatientStubByIndex(int index) const {
+    QVariantMap out; out["ok"] = false;
+    if (index < 0 || index >= m_patients.size()) { out["error"] = "index out of range"; return out; }
+
+    const QString anyPath = m_patients.at(index).sourceFilePath;
+    const QString wantedPID = m_patients.at(index).patientID.trimmed();
+    if (anyPath.isEmpty() || !QFileInfo::exists(anyPath)) { out["error"] = "no source file path"; return out; }
+
+    const QString root = QCoreApplication::applicationDirPath() + "/patients";
+
+    // 1) Базовая папка пациента из пути файла
+    QDir d = QFileInfo(anyPath).dir();
+    if (d.dirName().contains('_')) d.cdUp(); // подняться из папки исследования
+    QString patientFolder = d.absolutePath();
+
+    auto tryFindStubIn = [&](const QString& folder)->QString {
+        const QStringList nameFilters = { "*_patient*.dcm", "*_PATIENT*.dcm", "*_Patient*.dcm" };
+        QFileInfoList stubs = QDir(folder).entryInfoList(nameFilters, QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+        if (!stubs.isEmpty()) return stubs.first().absoluteFilePath();
+
+        // Fallback: ищем по SeriesDescription == PATIENT_STUB
+        const QFileInfoList all = QDir(folder).entryInfoList(QStringList() << "*.dcm" << "*.DCM",
+            QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+        for (const QFileInfo& fi : all) {
+            DcmFileFormat ff;
+            if (!ff.loadFile(QFile::encodeName(fi.absoluteFilePath()).constData()).good()) continue;
+            DcmDataset* ds = ff.getDataset();
+            OFString v;
+            if (ds->findAndGetOFString(DCM_SeriesDescription, v).good()) {
+                const QString desc = QString::fromLatin1(v.c_str());
+                if (desc.compare(QStringLiteral("PATIENT_STUB"), Qt::CaseInsensitive) == 0)
+                    return fi.absoluteFilePath();
+            }
+        }
+        return QString();
+        };
+
+    // 2) Сначала пытаемся в вычисленной папке
+    QString stubPath = tryFindStubIn(patientFolder);
+
+    // 3) Если это оказался корень /patients — пробегаемся по подпапкам и ищем по PatientID
+    if (stubPath.isEmpty() && QDir::cleanPath(patientFolder) == QDir::cleanPath(root)) {
+        const QFileInfoList subdirs = QDir(root).entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+        for (const QFileInfo& sdi : subdirs) {
+            const QString candidate = sdi.absoluteFilePath();
+
+            // Быстрая проверка: есть ли в этой папке DCM с тем же PatientID
+            bool pidMatch = false;
+            const QFileInfoList all = QDir(candidate).entryInfoList(QStringList() << "*.dcm" << "*.DCM",
+                QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+            for (const QFileInfo& fi : all) {
+                DcmFileFormat ff;
+                if (!ff.loadFile(QFile::encodeName(fi.absoluteFilePath()).constData()).good()) continue;
+
+                DcmDataset* ds = ff.getDataset();
+                OFString v, cs;
+                ds->findAndGetOFString(DCM_SpecificCharacterSet, cs);
+                if (ds->findAndGetOFString(DCM_PatientID, v).good()) {
+                    const QString pid = decodeDicomText(v, cs);
+                    if (!wantedPID.isEmpty() && wantedPID != "--" && pid.trimmed() == wantedPID) {
+                        pidMatch = true;
+                        break;
+                    }
+                }
+            }
+
+            if (pidMatch) {
+                // Нашли папку пациента — ищем в ней stub
+                stubPath = tryFindStubIn(candidate);
+                if (!stubPath.isEmpty()) {
+                    patientFolder = candidate;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (stubPath.isEmpty()) {
+        out["error"] = "stub not found";
+        out["patientFolder"] = patientFolder; // для диагностики
+        return out;
+    }
+
+    out["ok"] = true;
+    out["patientFolder"] = patientFolder;
+    out["stubPath"] = stubPath;
+    return out;
+}
+
+
+QVariantMap Lib4DICOM::readDemographicsFromFile(const QString& dcmPath) const {
+    QVariantMap out; out["ok"] = false;
+    if (dcmPath.isEmpty() || !QFileInfo::exists(dcmPath)) { out["error"] = "file not found"; return out; }
+
+    DcmFileFormat ff;
+    if (!ff.loadFile(QFile::encodeName(dcmPath).constData()).good()) { out["error"] = "load failed"; return out; }
+    DcmDataset* ds = ff.getDataset();
+
+    OFString v, cs;
+    ds->findAndGetOFString(DCM_SpecificCharacterSet, cs);
+
+    auto q = [&](const DcmTagKey& tag) -> QString {
+        if (ds->findAndGetOFString(tag, v).good()) return decodeDicomText(v, cs);
+        return QString();
+        };
+
+    out["patientName"] = q(DCM_PatientName).replace("^", " ");
+    const QString birth = q(DCM_PatientBirthDate);
+    out["patientBirth"] = birth;                 // "YYYY" или "YYYYMMDD" — как есть
+    out["patientSex"] = q(DCM_PatientSex);     // "M"/"F"/"O"
+    out["patientID"] = q(DCM_PatientID);
+    out["ok"] = true;
+    return out;
 }

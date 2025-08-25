@@ -90,6 +90,22 @@ public:
         const QString& patientBirth,
         const QString& patientSex);
 
+    Q_INVOKABLE QVariantMap getPatientDemographics(int index) const; // fullName, birthYear, sex, patientID, patientFolder
+    Q_INVOKABLE QVariantMap createStudyInPatientFolder(const QString& patientFolder,
+        const QString& patientID);
+
+
+    // Найти stub-файл пациента по индексу списка.
+// Возвращает: { ok, patientFolder, stubPath }
+    Q_INVOKABLE QVariantMap findPatientStubByIndex(int index) const;
+
+    // Прочитать демографию из конкретного DICOM-файла.
+    // Возвращает: { ok, patientName, patientBirth, patientSex, patientID }
+    Q_INVOKABLE QVariantMap readDemographicsFromFile(const QString& dcmPath) const;
+
+
+
+
 signals:
     void patientModelChanged();
 
@@ -99,6 +115,7 @@ private:
         QString birthYear;
         QString sex;
         QString patientID;
+        QString sourceFilePath;
     };
 
     // Нормализация и хелперы

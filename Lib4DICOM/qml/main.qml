@@ -1,7 +1,9 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import QtQuick.Dialogs 
+import QtQuick.Dialogs
+import Qt.labs.qmlmodels 1.0
+
 
 ApplicationWindow {
     id: win
@@ -10,15 +12,15 @@ ApplicationWindow {
     visible: true
     title: "DICOM — пациенты"
 
-Connections {
-    target: win
-    onProceed: {
-        console.log("[QML] proceed:", payload)
-    }
-}
-
     // Пользовательский сигнал: «идём дальше» с полезной нагрузкой
     signal proceed(string payload)
+
+    Connections {
+        target: win
+        onProceed: {
+            console.log("[QML] proceed:", payload)
+        }
+    }
 
     // Состояние выбора
     property bool  selectedIsNew: false      // выбрана ли строка «Новый пациент»
@@ -46,9 +48,13 @@ Connections {
 
                     Label {
                         Layout.alignment: Qt.AlignVCenter
-                        text: patientsList.count === 0
-                              ? "Пациенты (нет пациентов)"
-                              : "Пациенты (" + patientsList.count + " найдено)"
+                        text: {
+                            const base = (patientsList.count === 0
+                                          ? "Пациенты (нет пациентов)"
+                                          : "Пациенты (" + patientsList.count + " найдено)")
+                            const filtered = (tableFrame.filterName || tableFrame.filterBirth || tableFrame.filterSex !== "ALL")
+                            return base + (filtered ? " — фильтр" : "")
+                        }
                         font.bold: true
                     }
 
@@ -78,6 +84,11 @@ Connections {
                     property int sepW: 1
                     property color gridColor: "#c7cbd1"
                     property int nameW: width - yearW - sexW - 2*sepW
+
+                    // --- фильтры ---
+                    property string filterName: ""
+                    property string filterBirth: ""
+                    property string filterSex: "ALL"   // ALL/M/F/O
 
                     Column {
                         width: parent.width
@@ -116,7 +127,7 @@ Connections {
                                         anchors.fill: parent
                                         text: "Год рождения"
                                         horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Qt.AlignVCenter
+                                        verticalAlignment: Text.AlignVCenter
                                         color: "black"
                                     }
                                 }
@@ -129,7 +140,7 @@ Connections {
                                         anchors.fill: parent
                                         text: "Пол"
                                         horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Qt.AlignVCenter
+                                        verticalAlignment: Text.AlignVCenter
                                         color: "black"
                                     }
                                 }
@@ -145,13 +156,16 @@ Connections {
                             }
                         }
 
-                        // --- Данные ---
+                        // --- Данные (скроллируемая часть) ---
                         ScrollView {
                             id: sv
                             width: parent.width
-                            height: parent.height - headerRow.height
+                            height: parent.height - headerRow.height - footerRow.height
                             clip: true
                             ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+
+
 
                             ListView {
                                 id: patientsList
@@ -229,12 +243,10 @@ Connections {
                                         color: tableFrame.gridColor
                                     }
 
-
                                     MouseArea {
                                         anchors.fill: parent
                                         acceptedButtons: Qt.LeftButton
                                         hoverEnabled: true
-     
                                         onClicked: {
                                             // просто выделяем "Новый пациент"
                                             selectedIsNew = true
@@ -247,22 +259,39 @@ Connections {
                                             selectedIsNew = true
                                             selectedIndex = -1
                                             patientsList.currentIndex = -1
-                                            stack.push(nextPage)
+                                            stack.push(nextPage, { existingMode: false, existingIndex: -1 })
                                         }
 
                                         Keys.onEnterPressed: onDoubleClicked()
                                         Keys.onReturnPressed: onDoubleClicked()
                                     }
-
-
-
                                 }
 
                                 // Делегат обычных пациентов
                                 delegate: Rectangle {
-                                    height: 36
                                     width: patientsList.width
-                                    color: (selectedIsNew ? false : ListView.isCurrentItem) ? "#e6f2ff" : "white"
+                                    // подсветка текущего элемента (если выбрана не строка «Новый пациент»)
+                                    color: (!selectedIsNew && ListView.isCurrentItem) ? "#e6f2ff" : "white"
+
+                                    // фильтрация
+                                    function matchesFilter() {
+                                        const name  = (fullName || "").toLowerCase()
+                                        const birth = (birthYear || "").toString()
+                                        const sx    = (sex || "")
+
+                                        const fName  = tableFrame.filterName.toLowerCase()
+                                        const fBirth = tableFrame.filterBirth
+                                        const fSex   = tableFrame.filterSex
+
+                                        const nameOk  = !fName  || name.indexOf(fName) !== -1
+                                        const birthOk = !fBirth || birth.indexOf(fBirth) !== -1   // можно заменить на startsWith
+                                        const sexOk   = (fSex === "ALL") || (sx === fSex)
+
+                                        return nameOk && birthOk && sexOk
+                                    }
+
+                                    visible: matchesFilter()
+                                    height: visible ? 36 : 0
 
                                     Row {
                                         anchors.fill: parent
@@ -333,22 +362,209 @@ Connections {
                                             patientsList.currentIndex = index
                                             selectedIndex = index
                                         }
+
                                         onDoubleClicked: {
-                                            // двойной клик — выбираем пациента и завершаем (как "Далее" для существующего)
                                             selectedIsNew = false
                                             patientsList.currentIndex = index
                                             selectedIndex = index
-
-                                            // при необходимости — шлём сигнал наверх (как у тебя было)
-                                            win.proceed("START")
-
-                                            // закрываем окно
-                                            win.close()
+                                            stack.push(nextPage, { existingMode: true, existingIndex: index })
                                         }
                                     }
                                 }
                             }
                         }
+
+// --- Футер с фильтрами (фиксированная строка под списком) ---
+Rectangle {
+    id: footerRow
+    height: 36
+    width: parent.width
+    color: tableFrame.uiPanelBg
+
+    Row {
+        anchors.fill: parent
+        spacing: 0
+
+        // ФИО — фильтр по подстроке
+        Rectangle {
+            width: tableFrame.nameW
+            height: parent.height
+            color: "transparent"
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 6
+                spacing: 6
+
+                TextField {
+                    Layout.fillWidth: true
+                    placeholderText: "Поиск по ФИО…"
+                    text: tableFrame.filterName
+                    onTextChanged: tableFrame.filterName = text
+                    color: tableFrame.uiText
+                    placeholderTextColor: tableFrame.uiTextHint
+
+                    background: Rectangle {
+                        radius: 6
+                        color: tableFrame.uiFieldBg         // фон поля совпадает с popup
+                        border.color: parent.focus ? tableFrame.uiFieldBorderFocus
+                                                   : tableFrame.uiFieldBorder
+                        border.width: 1
+                    }
+                }
+
+                ToolButton {
+                    text: "×"
+                    visible: tableFrame.filterName.length > 0
+                    onClicked: tableFrame.filterName = ""
+                    // делаем кнопку аккуратной
+                    background: Rectangle { radius: 6; color: "transparent" }
+                }
+            }
+        }
+
+        // Вертикальный разделитель
+        Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
+
+        // Год рождения — фильтр
+        Rectangle {
+            width: tableFrame.yearW
+            height: parent.height
+            color: "transparent"
+            TextField {
+                anchors.fill: parent
+                anchors.margins: 6
+                placeholderText: "Год…"
+                inputMethodHints: Qt.ImhPreferNumbers
+                text: tableFrame.filterBirth
+                onTextChanged: tableFrame.filterBirth = text
+                horizontalAlignment: Text.AlignHCenter
+                color: tableFrame.uiText
+                placeholderTextColor: tableFrame.uiTextHint
+
+                background: Rectangle {
+                    radius: 6
+                    color: tableFrame.uiFieldBg
+                    border.color: parent.focus ? tableFrame.uiFieldBorderFocus
+                                               : tableFrame.uiFieldBorder
+                    border.width: 1
+                }
+            }
+        }
+
+        // Вертикальный разделитель
+        Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
+
+        // Пол — выпадающий список
+        Rectangle {
+            width: tableFrame.sexW
+            height: parent.height
+            color: "transparent"
+
+            ComboBox {
+                id: sexFilter
+                anchors.fill: parent
+                anchors.margins: 4
+                textRole: "text"
+                valueRole: "value"
+                model: [
+                    { text: "Все", value: "ALL" },
+                    { text: "М",   value: "M"   },
+                    { text: "Ж",   value: "F"   },
+                    { text: "Др.", value: "O"   }
+                ]
+                onCurrentIndexChanged: tableFrame.filterSex = currentValue
+
+                // Текст в закрытом состоянии
+                contentItem: Text {
+                    text: sexFilter.displayText
+                    verticalAlignment: Text.AlignVCenter
+                    leftPadding: 8; rightPadding: 24
+                    color: tableFrame.uiText
+                    elide: Text.ElideRight
+                }
+
+                // Стрелка
+                indicator: Text {
+                    text: "\u25BE"  // ▾
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.right: parent.right
+                    anchors.rightMargin: 8
+                    color: tableFrame.uiTextHint
+                }
+
+                // Фон комбобокса (совпадает с полями)
+                background: Rectangle {
+                    radius: 6
+                    color: tableFrame.uiFieldBg
+                    border.color: sexFilter.activeFocus ? tableFrame.uiFieldBorderFocus : tableFrame.uiFieldBorder
+                    border.width: 1
+                }
+
+                // === ВАЖНО: свой popup с корректной моделью ===
+                popup: Popup {
+                    y: sexFilter.height
+                    width: sexFilter.width
+                    padding: 0
+                    implicitHeight: Math.min(list.implicitHeight, 240)
+
+                    background: Rectangle {
+                        radius: 6
+                        color: tableFrame.uiFieldBg   // тот же фон, что у полей
+                        border.color: tableFrame.uiFieldBorder
+                        border.width: 1
+                    }
+
+                    contentItem: ListView {
+                        id: list
+                        clip: true
+                        implicitHeight: contentHeight
+                        model: sexFilter.model                // <-- не delegateModel!
+                        currentIndex: sexFilter.highlightedIndex
+
+                        delegate: ItemDelegate {
+                            width: list.width
+                            text: (typeof modelData === "object")
+                                    ? modelData[sexFilter.textRole]
+                                    : String(modelData)
+                            background: Rectangle {
+                                color: pressed ? tableFrame.uiItemPressed
+                                               : (hovered ? tableFrame.uiItemHover
+                                                          : tableFrame.uiFieldBg)
+                            }
+                            contentItem: Text {
+                                text: parent.text
+                                color: tableFrame.uiText
+                                elide: Text.ElideRight
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 8; rightPadding: 8
+                            }
+                            onClicked: {
+                                sexFilter.currentIndex = index
+                                sexFilter.popup.close()
+                            }
+                        }
+                    }
+                }
+            }
+
+
+        }
+    }
+
+    // верхняя разделительная линия футера
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: 1
+        color: tableFrame.gridColor
+    }
+}
+
+
+
+
+
                     }
                 }
 
@@ -373,12 +589,10 @@ Connections {
                             onClicked: {
                                 if (selectedIsNew) {
                                     // Открываем страницу создания/ввода нового пациента
-                                    stack.push(nextPage)
-                                } else {
-                                    // Отправляем сигнал и закрываем окно
-                                    win.proceed("START")
-                                    stack.push(nextPage)
-                                    //win.close()
+                                    stack.push(nextPage, { existingMode: false, existingIndex: -1 })
+                                } else if (selectedIndex >= 0) {
+                                    // Переходим к существующему пациенту
+                                    stack.push(nextPage, { existingMode: true, existingIndex: selectedIndex })
                                 }
                             }
                         }
@@ -397,16 +611,44 @@ Connections {
                 RowLayout {
                     anchors.fill: parent
                     ToolButton { text: "←"; onClicked: stack.pop() }
-                    Label { text: "Следующее окно"; Layout.alignment: Qt.AlignVCenter }
+                    Label {
+                        text: pageNew.existingMode ? "Добавить снимок к существующему пациенту" : "Создать нового пациента"
+                        Layout.alignment: Qt.AlignVCenter
+                    }
                 }
             }
 
             // локальные данные пациента (ВСЕ объявлены на Page!)
+            property bool existingMode: false
+            property int  existingIndex: -1
+
             property string pName: ""
             property string pBirth: ""
             property string pSex: ""
-            property string pFile: ""
             property string pPatientID: ""
+            property string pPatientFolder: ""
+            property string pFile: ""  // выбранное изображение
+
+            Component.onCompleted: {
+                if (existingMode && existingIndex >= 0 && appLogic) {
+                    const stubInfo = appLogic.findPatientStubByIndex(existingIndex)
+                    if (!stubInfo || !stubInfo.ok) {
+                        console.warn("[QML] stub not found:", stubInfo ? stubInfo.error : "undefined")
+                        return
+                    }
+                    pPatientFolder = stubInfo.patientFolder
+
+                    const demo = appLogic.readDemographicsFromFile(stubInfo.stubPath)
+                    if (!demo || !demo.ok) {
+                        console.warn("[QML] demo read failed")
+                        return
+                    }
+                    pName      = demo.patientName  || "--"
+                    pBirth     = demo.patientBirth || "--"
+                    pSex       = demo.patientSex   || "O"
+                    pPatientID = demo.patientID    || "--"
+                }
+            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -429,7 +671,9 @@ Connections {
                             Layout.fillWidth: true
                             placeholderText: "Иванов Иван Иванович"
                             text: pageNew.pName
-                            onTextChanged: pageNew.pName = text
+                            onTextChanged: if (!pageNew.existingMode) pageNew.pName = text
+                            enabled: !pageNew.existingMode
+                            readOnly: pageNew.existingMode
                         }
 
                         Label { text: "Дата рождения:" }
@@ -439,7 +683,9 @@ Connections {
                             placeholderText: "YYYY или YYYYMMDD"
                             inputMethodHints: Qt.ImhPreferNumbers
                             text: pageNew.pBirth
-                            onTextChanged: pageNew.pBirth = text
+                            onTextChanged: if (!pageNew.existingMode) pageNew.pBirth = text
+                            enabled: !pageNew.existingMode
+                            readOnly: pageNew.existingMode
                         }
 
                         Label { text: "Пол:" }
@@ -453,8 +699,17 @@ Connections {
                                 { text: "Женский", value: "F" },
                                 { text: "Другое/не указано", value: "O" }
                             ]
-                            onCurrentIndexChanged: pageNew.pSex = currentValue
-                            Component.onCompleted: pageNew.pSex = currentValue
+                            onCurrentIndexChanged: if (!pageNew.existingMode) pageNew.pSex = currentValue
+                            Component.onCompleted: {
+                                if (pageNew.existingMode) {
+                                    const v = pageNew.pSex || "O"
+                                    const idx = model.findIndex(m => m.value === v)
+                                    if (idx >= 0) currentIndex = idx
+                                } else {
+                                    pageNew.pSex = currentValue
+                                }
+                            }
+                            enabled: !pageNew.existingMode
                         }
 
                         // --- Новые поля ---
@@ -464,7 +719,9 @@ Connections {
                             Layout.fillWidth: true
                             placeholderText: "Напр.: P12345"
                             text: pageNew.pPatientID
-                            onTextChanged: pageNew.pPatientID = text
+                            onTextChanged: if (!pageNew.existingMode) pageNew.pPatientID = text
+                            enabled: !pageNew.existingMode
+                            readOnly: pageNew.existingMode
                         }
                     }
                 }
@@ -493,27 +750,77 @@ Connections {
                     title: "Выберите файл изображения"
                     fileMode: FileDialog.OpenFile
                     nameFilters: [ "Изображения (*.bmp *.jpeg *.jpg *.png)", "Все файлы (*)" ]
+
                     onAccepted: {
-                        const urlStr = selectedFile.toString()
-                        const localPath = decodeURIComponent(urlStr.replace(/^file:\/+/, ""))
+                        const localPath = selectedFile && selectedFile.toLocalFile ? selectedFile.toLocalFile() : ""
 
                         pageNew.pFile = localPath
                         filePathField.text = localPath
 
-                        console.log("[FileDialog] URL:", urlStr)
-                        console.log("[FileDialog] Local path:", localPath)
-
+                        // общий лог (как у тебя было)
                         if (appLogic && appLogic.logSelectedFileAndPatient) {
-                            appLogic.logSelectedFileAndPatient(
-                                localPath,
-                                pageNew.pName,
-                                pageNew.pBirth,
-                                pageNew.pSex
-                            )
+                            appLogic.logSelectedFileAndPatient(localPath, pageNew.pName, pageNew.pBirth, pageNew.pSex)
+                        }
+
+                        // НОВОЕ: если выбран существующий пациент — сразу создаём study и сохраняем
+                        if (!pageNew.existingMode)
+                            return
+
+                        // фолбэк: если папка пациента/ID ещё не известны — подтянуть из stub
+                        if ((!pageNew.pPatientFolder || !pageNew.pPatientID) &&
+                            appLogic && appLogic.findPatientStubByIndex && appLogic.readDemographicsFromFile) {
+                            const stubInfo = appLogic.findPatientStubByIndex(pageNew.existingIndex)
+                            if (stubInfo && stubInfo.ok) {
+                                pageNew.pPatientFolder = stubInfo.patientFolder
+                                const demo = appLogic.readDemographicsFromFile(stubInfo.stubPath)
+                                if (demo && demo.ok) {
+                                    pageNew.pName      = demo.patientName  || pageNew.pName
+                                    pageNew.pBirth     = demo.patientBirth || pageNew.pBirth
+                                    pageNew.pSex       = demo.patientSex   || pageNew.pSex
+                                    pageNew.pPatientID = demo.patientID    || pageNew.pPatientID
+                                }
+                            }
+                        }
+
+                        if (!appLogic || !appLogic.createStudyInPatientFolder) {
+                            console.warn("[QML] createStudyInPatientFolder not found")
+                            return
+                        }
+                        if (!pageNew.pPatientFolder || !pageNew.pPatientID) {
+                            console.warn("[QML] patientFolder or patientID is empty")
+                            return
+                        }
+
+                        const study = appLogic.createStudyInPatientFolder(pageNew.pPatientFolder, pageNew.pPatientID)
+                        if (!study || !study.ok) {
+                            console.warn("[QML] Failed to create study:", study ? study.error : "undefined")
+                            return
+                        }
+
+                        if (!appLogic || !appLogic.convertAndSaveImageAsDicom) {
+                            console.warn("[QML] convertAndSaveImageAsDicom not found")
+                            return
+                        }
+
+                        const res = appLogic.convertAndSaveImageAsDicom(
+                            pageNew.pFile,
+                            study.studyFolder,
+                            pageNew.pPatientID,
+                            "SER01",
+                            study.studyUID,
+                            pageNew.pName,
+                            pageNew.pBirth, // "YYYY" или "YYYYMMDD"
+                            pageNew.pSex    // "M"/"F"/"O"
+                        )
+
+                        if (res && res.ok) {
+                            console.log("[QML] Saved for existing patient OK:", JSON.stringify(res))
+                            // при желании: win.close()
                         } else {
-                            console.warn("appLogic.logSelectedFileAndPatient не найден")
+                            console.warn("[QML] Save failed:", res ? res.error : "unknown", JSON.stringify(res))
                         }
                     }
+
                     onRejected: console.log("[FileDialog] отменено пользователем")
                 }
 
@@ -522,11 +829,10 @@ Connections {
                     Layout.alignment: Qt.AlignRight
                     Layout.topMargin: 8
 
-
-
                     Button {
                         text: "Далее"
                         onClicked: {
+                            // Сценарий НОВОГО пациента (существующий уже сохраняется при выборе файла)
                             // 1) Собираем данные пациента
                             let patient = null
                             if (appLogic && appLogic.makePatientFromStrings) {
@@ -539,7 +845,7 @@ Connections {
 
                             // 2) Создаём исследование для нового пациента
                             let study = null
-                            if (win.selectedIsNew && patient && appLogic && appLogic.createStudyForNewPatient) {
+                            if (!pageNew.existingMode && patient && appLogic && appLogic.createStudyForNewPatient) {
                                 study = appLogic.createStudyForNewPatient(
                                     patient.fullName, patient.birthYear, patient.patientID
                                 )
@@ -548,14 +854,14 @@ Connections {
                                     return
                                 }
 
-                                // 2.1) Создаём stub DICOM в корне папки пациента (демография)
+                                // 2.1) Stub DICOM в корне папки пациента (демография)
                                 if (appLogic && appLogic.createPatientStubDicom && study.patientFolder) {
                                     const stub = appLogic.createPatientStubDicom(
-                                        study.patientFolder,            // корневой каталог пациента
+                                        study.patientFolder,
                                         patient.patientID,
                                         patient.fullName,
-                                        patient.birthYear,              // "YYYY" или "YYYYMMDD"
-                                        patient.sex                     // "M"/"F"/"O"
+                                        patient.birthYear,
+                                        patient.sex
                                     )
                                     if (!stub.ok) console.warn("[QML] Stub DICOM failed:", stub.error)
                                     else          console.log("[QML] Stub DICOM created:", stub.path)
@@ -564,8 +870,9 @@ Connections {
                                 }
                             }
 
-                            // 3) Файл -> QVector<QImage> -> DICOM (всё внутри C++)
-                            if (pageNew.pFile && pageNew.pFile.length > 0 && study &&
+                            // 3) Файл -> QVector<QImage> -> DICOM
+                            if (!pageNew.existingMode &&
+                                pageNew.pFile && pageNew.pFile.length > 0 && study &&
                                 appLogic && appLogic.convertAndSaveImageAsDicom) {
 
                                 const res = appLogic.convertAndSaveImageAsDicom(
@@ -575,11 +882,13 @@ Connections {
                                   "SER01",
                                   study.studyUID,
                                   patient.fullName,
-                                  patient.birthYear, // запишется как DA "YYYY" или "YYYYMMDD"
-                                  patient.sex        // "M"/"F"/"O"
+                                  patient.birthYear,
+                                  patient.sex
                                 )
-                                console.log("[QML] DICOM save:", JSON.stringify(res))
+                                console.log("[QML] DICOM save (new patient):", JSON.stringify(res))
                             }
+
+                            console.log("stubInfo =", JSON.stringify(appLogic.findPatientStubByIndex(pageNew.existingIndex)))
 
                             // 4) Очистка и закрытие
                             pageNew.pName = ""
@@ -590,14 +899,8 @@ Connections {
                             win.close()
                         }
                     }
-
-
-
                 }
             }
         }
     }
-
-
-
 }
