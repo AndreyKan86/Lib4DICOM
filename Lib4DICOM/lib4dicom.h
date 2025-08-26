@@ -49,19 +49,7 @@ public:
         const QString& birthYearNormalized,
         const QString& patientID);
 
-    // ====== Сохранение DICOM (SC) — базовая версия (только QVector) ======
-    Q_INVOKABLE QVariantMap saveImagesAsDicom(const QVector<QImage>& images,
-        const QString& outFolder,
-        const QString& patientID,
-        const QString& seriesName,
-        const QString& studyUID);
 
-    // Комбайн: файл -> QVector<QImage> -> DICOM (базовая версия)
-    Q_INVOKABLE QVariantMap convertAndSaveImageAsDicom(const QString& imagePath,
-        const QString& studyFolder,
-        const QString& patientID,
-        const QString& seriesName,
-        const QString& studyUID);
 
     // ====== Полная версия: с демографией (только QVector) ======
     Q_INVOKABLE QVariantMap saveImagesAsDicom(const QVector<QImage>& images,

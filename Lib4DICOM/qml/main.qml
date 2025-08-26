@@ -175,66 +175,23 @@ ApplicationWindow {
                                 clip: true
                                 interactive: true
 
-                                // Хедер — строка «Новый пациент»
+
                                 header: Rectangle {
                                     width: patientsList.width
                                     height: 36
                                     color: selectedIsNew ? "#e6f2ff" : "white"
 
-                                    Row {
+                                    Text {
                                         anchors.fill: parent
-                                        spacing: 0
-
-                                        // ФИО (Новый пациент)
-                                        Rectangle {
-                                            width: tableFrame.nameW
-                                            height: parent.height
-                                            color: "transparent"
-                                            Text {
-                                                anchors.fill: parent
-                                                anchors.margins: 8
-                                                text: "Новый пациент"
-                                                elide: Text.ElideRight
-                                                verticalAlignment: Text.AlignVCenter
-                                                color: "black"
-                                                font.bold: true
-                                            }
-                                        }
-                                        // вертикальный разделитель
-                                        Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
-
-                                        // Год рождения (пусто/тире)
-                                        Rectangle {
-                                            width: tableFrame.yearW
-                                            height: parent.height
-                                            color: "transparent"
-                                            Text {
-                                                anchors.fill: parent
-                                                text: "-"
-                                                horizontalAlignment: Text.AlignHCenter
-                                                verticalAlignment: Text.AlignVCenter
-                                                color: "black"
-                                            }
-                                        }
-                                        // вертикальный разделитель
-                                        Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
-
-                                        // Пол (пусто/тире)
-                                        Rectangle {
-                                            width: tableFrame.sexW
-                                            height: parent.height
-                                            color: "transparent"
-                                            Text {
-                                                anchors.fill: parent
-                                                text: "-"
-                                                horizontalAlignment: Text.AlignHCenter
-                                                verticalAlignment: Text.AlignVCenter
-                                                color: "black"
-                                            }
-                                        }
+                                        anchors.margins: 8
+                                        text: "Новый пациент"
+                                        verticalAlignment: Text.AlignVCenter
+                                        horizontalAlignment: Text.AlignHCenter
+                                        color: "black"
+                                        font.bold: true
+                                        elide: Text.ElideRight
                                     }
 
-                                    // Горизонтальная линия
                                     Rectangle {
                                         anchors.left: parent.left
                                         anchors.right: parent.right
@@ -246,26 +203,23 @@ ApplicationWindow {
                                     MouseArea {
                                         anchors.fill: parent
                                         acceptedButtons: Qt.LeftButton
-                                        hoverEnabled: true
                                         onClicked: {
-                                            // просто выделяем "Новый пациент"
                                             selectedIsNew = true
                                             selectedIndex = -1
                                             patientsList.currentIndex = -1
                                         }
-
                                         onDoubleClicked: {
-                                            // мгновенно переходим к форме создания пациента
                                             selectedIsNew = true
                                             selectedIndex = -1
                                             patientsList.currentIndex = -1
                                             stack.push(nextPage, { existingMode: false, existingIndex: -1 })
                                         }
-
                                         Keys.onEnterPressed: onDoubleClicked()
                                         Keys.onReturnPressed: onDoubleClicked()
                                     }
                                 }
+
+
 
                                 // Делегат обычных пациентов
                                 delegate: Rectangle {
@@ -629,26 +583,33 @@ Rectangle {
             property string pPatientFolder: ""
             property string pFile: ""  // выбранное изображение
 
-            Component.onCompleted: {
-                if (existingMode && existingIndex >= 0 && appLogic) {
-                    const stubInfo = appLogic.findPatientStubByIndex(existingIndex)
-                    if (!stubInfo || !stubInfo.ok) {
-                        console.warn("[QML] stub not found:", stubInfo ? stubInfo.error : "undefined")
-                        return
-                    }
-                    pPatientFolder = stubInfo.patientFolder
-
-                    const demo = appLogic.readDemographicsFromFile(stubInfo.stubPath)
-                    if (!demo || !demo.ok) {
-                        console.warn("[QML] demo read failed")
-                        return
-                    }
-                    pName      = demo.patientName  || "--"
-                    pBirth     = demo.patientBirth || "--"
-                    pSex       = demo.patientSex   || "O"
-                    pPatientID = demo.patientID    || "--"
-                }
+Component.onCompleted: {
+    if (existingMode && existingIndex >= 0 && appLogic) {
+        // Пытаемся через stub
+        const stubInfo = appLogic.findPatientStubByIndex(existingIndex)
+        if (stubInfo && stubInfo.ok) {
+            pPatientFolder = stubInfo.patientFolder
+            const demo = appLogic.readDemographicsFromFile(stubInfo.stubPath)
+            if (demo && demo.ok) {
+                pName      = demo.patientName  || "--"
+                pBirth     = demo.patientBirth || "--"
+                pSex       = demo.patientSex   || "O"
+                pPatientID = demo.patientID    || "--"
             }
+        } else {
+            // ФОЛБЭК БЕЗ СТАБА
+            const g = appLogic.getPatientDemographics(existingIndex)
+            if (g && g.ok) {
+                pName         = g.fullName    || pName
+                pBirth        = g.birthYear   || pBirth
+                pSex          = g.sex         || pSex
+                pPatientID    = g.patientID   || pPatientID
+                pPatientFolder= g.patientFolder || pPatientFolder
+            }
+        }
+    }
+}
+
 
             ColumnLayout {
                 anchors.fill: parent
@@ -752,40 +713,63 @@ Rectangle {
                     nameFilters: [ "Изображения (*.bmp *.jpeg *.jpg *.png)", "Все файлы (*)" ]
 
                     onAccepted: {
-                        const localPath = selectedFile && selectedFile.toLocalFile ? selectedFile.toLocalFile() : ""
+                        // 1) Берём URL из любого доступного свойства
+                        var url = null
+
+                        if (fileDialog.selectedFile)                 // Qt 6.x
+                            url = fileDialog.selectedFile
+                        else if (fileDialog.fileUrl)                 // Qt 5.15.x
+                            url = fileDialog.fileUrl
+                        else if (fileDialog.currentFile)             // некоторые сборки/плагины
+                            url = fileDialog.currentFile
+                        else if (fileDialog.selectedFiles && fileDialog.selectedFiles.length > 0)
+                            url = fileDialog.selectedFiles[0]
+                        else if (fileDialog.fileUrls && fileDialog.fileUrls.length > 0)
+                            url = fileDialog.fileUrls[0]
+
+                        // 2) Превращаем в локальный путь
+                        var localPath = ""
+                        if (url && url.toLocalFile) {
+                            localPath = url.toLocalFile()
+                        } else if (url && url.toString) {
+                            // fallback: отрезаем file:/// вручную
+                            var s = url.toString()
+                            if (s.startsWith("file:///"))      localPath = s.substr(8)
+                            else if (s.startsWith("file://"))  localPath = s.substr(7)
+                            else                                localPath = s
+                        }
+
+                        if (!localPath || localPath.length === 0) {
+                            console.warn("[QML] cannot extract localPath from FileDialog:", url)
+                            return
+                        }
 
                         pageNew.pFile = localPath
                         filePathField.text = localPath
+                        console.log("[QML] chosen image:", localPath)
 
-                        // общий лог (как у тебя было)
-                        if (appLogic && appLogic.logSelectedFileAndPatient) {
-                            appLogic.logSelectedFileAndPatient(localPath, pageNew.pName, pageNew.pBirth, pageNew.pSex)
-                        }
-
-                        // НОВОЕ: если выбран существующий пациент — сразу создаём study и сохраняем
+                        // ===== дальше твоя логика для существующего пациента =====
                         if (!pageNew.existingMode)
                             return
-
-                        // фолбэк: если папка пациента/ID ещё не известны — подтянуть из stub
-                        if ((!pageNew.pPatientFolder || !pageNew.pPatientID) &&
-                            appLogic && appLogic.findPatientStubByIndex && appLogic.readDemographicsFromFile) {
-                            const stubInfo = appLogic.findPatientStubByIndex(pageNew.existingIndex)
-                            if (stubInfo && stubInfo.ok) {
-                                pageNew.pPatientFolder = stubInfo.patientFolder
-                                const demo = appLogic.readDemographicsFromFile(stubInfo.stubPath)
-                                if (demo && demo.ok) {
-                                    pageNew.pName      = demo.patientName  || pageNew.pName
-                                    pageNew.pBirth     = demo.patientBirth || pageNew.pBirth
-                                    pageNew.pSex       = demo.patientSex   || pageNew.pSex
-                                    pageNew.pPatientID = demo.patientID    || pageNew.pPatientID
-                                }
-                            }
-                        }
 
                         if (!appLogic || !appLogic.createStudyInPatientFolder) {
                             console.warn("[QML] createStudyInPatientFolder not found")
                             return
                         }
+
+                        // если папка/ID ещё не заполнены — возьмём из модели
+                        if ((!pageNew.pPatientFolder || !pageNew.pPatientID) &&
+                            appLogic && appLogic.getPatientDemographics && pageNew.existingIndex >= 0) {
+                            const g = appLogic.getPatientDemographics(pageNew.existingIndex)
+                            if (g && g.ok) {
+                                pageNew.pPatientFolder = pageNew.pPatientFolder || g.patientFolder
+                                pageNew.pPatientID     = pageNew.pPatientID     || g.patientID
+                                pageNew.pName          = pageNew.pName          || g.fullName
+                                pageNew.pBirth         = pageNew.pBirth         || g.birthYear
+                                pageNew.pSex           = pageNew.pSex           || g.sex
+                            }
+                        }
+
                         if (!pageNew.pPatientFolder || !pageNew.pPatientID) {
                             console.warn("[QML] patientFolder or patientID is empty")
                             return
@@ -793,7 +777,7 @@ Rectangle {
 
                         const study = appLogic.createStudyInPatientFolder(pageNew.pPatientFolder, pageNew.pPatientID)
                         if (!study || !study.ok) {
-                            console.warn("[QML] Failed to create study:", study ? study.error : "undefined")
+                            console.warn("[QML] failed to create study:", study ? study.error : "undefined")
                             return
                         }
 
@@ -809,20 +793,17 @@ Rectangle {
                             "SER01",
                             study.studyUID,
                             pageNew.pName,
-                            pageNew.pBirth, // "YYYY" или "YYYYMMDD"
-                            pageNew.pSex    // "M"/"F"/"O"
+                            pageNew.pBirth,
+                            pageNew.pSex
                         )
-
-                        if (res && res.ok) {
-                            console.log("[QML] Saved for existing patient OK:", JSON.stringify(res))
-                            // при желании: win.close()
-                        } else {
-                            console.warn("[QML] Save failed:", res ? res.error : "unknown", JSON.stringify(res))
-                        }
+                        console.log("[QML] Save existing:", JSON.stringify(res))
                     }
 
-                    onRejected: console.log("[FileDialog] отменено пользователем")
+                    onRejected: console.log("[QML] FileDialog canceled")
                 }
+
+
+
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -869,6 +850,14 @@ Rectangle {
                                     console.warn("[QML] createPatientStubDicom не найден или нет patientFolder")
                                 }
                             }
+        
+                            let res = null
+
+                            console.log("[QML] pageNew.existingMode:", pageNew.existingMode)
+                            console.log("[QML] pageNew.pFile:", pageNew.pFile)
+                            console.log("[QML] pageNew.pFile.length > 0:", (pageNew.pFile.length > 0))
+                            console.log("[QML] study:", study)
+                            console.log("[QML] appLogic", appLogic.convertAndSaveImageAsDicom)
 
                             // 3) Файл -> QVector<QImage> -> DICOM
                             if (!pageNew.existingMode &&
@@ -886,9 +875,11 @@ Rectangle {
                                   patient.sex
                                 )
                                 console.log("[QML] DICOM save (new patient):", JSON.stringify(res))
-                            }
+                            } else {
+                                    console.log("[QML] DICOM not save (new patient):", JSON.stringify(res))
+                                    }
 
-                            console.log("stubInfo =", JSON.stringify(appLogic.findPatientStubByIndex(pageNew.existingIndex)))
+                          
 
                             // 4) Очистка и закрытие
                             pageNew.pName = ""
