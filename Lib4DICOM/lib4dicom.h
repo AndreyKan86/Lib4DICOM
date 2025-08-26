@@ -14,17 +14,29 @@
 class LIB4DICOM_EXPORT Lib4DICOM : public QAbstractListModel {
     Q_OBJECT
         Q_PROPERTY(QAbstractItemModel* patientModel READ patientModel NOTIFY patientModelChanged)
+        Q_PROPERTY(QString studyLabel READ studyLabel WRITE setStudyLabel NOTIFY studyLabelChanged)
 
 public:
     enum Roles { FullNameRole = Qt::UserRole + 1, BirthYearRole, SexRole };
+
     explicit Lib4DICOM(QObject* parent = nullptr);
 
-    // QAbstractListModel
+    // ==== Настройки ====
+    QString studyLabel() const { return m_studyLabel; }
+    void setStudyLabel(const QString& s) {
+        QString v = s;
+        if (v.trimmed().isEmpty()) v = "Study";
+        if (v == m_studyLabel) return;
+        m_studyLabel = v;
+        emit studyLabelChanged();
+    }
+
+    // ==== QAbstractListModel ====
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    // QML API
+    // ==== QML API ====
     QAbstractItemModel* patientModel();
     Q_INVOKABLE void scanPatients();
 
@@ -42,16 +54,16 @@ public:
     Q_INVOKABLE QImage          loadImageFromFile(const QString& localPath);
     Q_INVOKABLE QVector<QImage> loadImageVectorFromFile(const QString& localPath);
 
-    // ФС для пациента/исследования
+    // ФС для пациента/исследования (БЕЗ нормализации имён/символов)
     Q_INVOKABLE QString     ensurePatientFolder(const QString& fullName,
-        const QString& birthYearNormalized);
+        const QString& birthYear);
     Q_INVOKABLE QVariantMap createStudyForNewPatient(const QString& fullName,
-        const QString& birthYearNormalized,
+        const QString& birthYear,
+        const QString& patientID);
+    Q_INVOKABLE QVariantMap createStudyInPatientFolder(const QString& patientFolder,
         const QString& patientID);
 
-
-
-    // ====== Полная версия: с демографией (только QVector) ======
+    // Полная версия: сохранение DICOM (SC) с демографией
     Q_INVOKABLE QVariantMap saveImagesAsDicom(const QVector<QImage>& images,
         const QString& outFolder,
         const QString& patientID,
@@ -71,31 +83,21 @@ public:
         const QString& patientBirth,
         const QString& patientSex);
 
-    // Пустой DICOM в корне папки пациента с демографией
+    // Пустой DICOM (stub) в корне папки пациента с демографией
     Q_INVOKABLE QVariantMap createPatientStubDicom(const QString& patientFolder,
         const QString& patientID,
         const QString& patientName,
         const QString& patientBirth,
         const QString& patientSex);
 
+    // Утилиты для UI
     Q_INVOKABLE QVariantMap getPatientDemographics(int index) const; // fullName, birthYear, sex, patientID, patientFolder
-    Q_INVOKABLE QVariantMap createStudyInPatientFolder(const QString& patientFolder,
-        const QString& patientID);
-
-
-    // Найти stub-файл пациента по индексу списка.
-// Возвращает: { ok, patientFolder, stubPath }
-    Q_INVOKABLE QVariantMap findPatientStubByIndex(int index) const;
-
-    // Прочитать демографию из конкретного DICOM-файла.
-    // Возвращает: { ok, patientName, patientBirth, patientSex, patientID }
-    Q_INVOKABLE QVariantMap readDemographicsFromFile(const QString& dcmPath) const;
-
-
-
+    Q_INVOKABLE QVariantMap findPatientStubByIndex(int index) const; // { ok, patientFolder, stubPath }
+    Q_INVOKABLE QVariantMap readDemographicsFromFile(const QString& dcmPath) const; // { ok, patientName, patientBirth, patientSex, patientID }
 
 signals:
     void patientModelChanged();
+    void studyLabelChanged();
 
 private:
     struct Patient {
@@ -106,23 +108,12 @@ private:
         QString sourceFilePath;
     };
 
-    // Нормализация и хелперы
-    static QString normalizeBirthYear(const QString& birthInput);
-    static QString normalizeSex(const QString& sexInput);
-    static QString normalizeID(const QString& idInput);
-    static QString makeSafeFolderName(const QString& s);
+    // ===== Хелперы без «нормализации» =====
     static QString generateDicomUID();
-
-    static QString toDicomPN(const QString& fullName);    // "Иванов Иван" -> "Иванов^Иван"
-    static QString toDicomDA(const QString& birthInput);  // "YYYY" или "YYYYMMDD"
-    static QString toDicomSex(const QString& sexInput);   // "M"/"F"/"O"
-
-    // Декодирование текстов DICOM с учётом SpecificCharacterSet
-    static QString decodeDicomText(const OFString& value,
-        const OFString& specificCharacterSet);
-
+    static QString decodeDicomText(const OFString& value, const OFString& specificCharacterSet);
     static QImage  toRgb888(const QImage& src);
+    static QString safeNameForPath(const QString& s);
 
     QList<Patient> m_patients;
+    QString m_studyLabel = "Study";
 };
-  

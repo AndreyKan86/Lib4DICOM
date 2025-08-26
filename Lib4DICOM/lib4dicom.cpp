@@ -52,32 +52,6 @@ QAbstractItemModel* Lib4DICOM::patientModel() {
     return this;
 }
 
-// ---------------- Нормализация ввода ----------------
-QString Lib4DICOM::normalizeBirthYear(const QString& birthInput) {
-    QString digits = birthInput;
-    digits.remove(QRegularExpression(QStringLiteral(R"([^0-9])")));
-    if (digits.size() >= 4) return digits.left(4);
-    return QStringLiteral("--");
-}
-
-QString Lib4DICOM::normalizeSex(const QString& sexInput) {
-    QString s = sexInput.trimmed().toUpper();
-    if (s == "M" || s == "М" || s.startsWith("МУЖ")) return "M";
-    if (s == "F" || s == "Ж" || s.startsWith("ЖЕН")) return "F";
-    if (s == "O" || s == "ДРУГОЕ" || s == "НЕ УКАЗАНО") return "O";
-    if (s == "MALE") return "M";
-    if (s == "FEMALE") return "F";
-    if (s == "OTHER" || s == "UNSPECIFIED") return "O";
-    return "O";
-}
-
-QString Lib4DICOM::normalizeID(const QString& idInput) {
-    QString t = idInput.trimmed();
-    t.replace(QRegularExpression(R"([^A-Za-z0-9_\-\.])"), "");
-    if (t.isEmpty()) t = "--";
-    if (t.size() > 64) t = t.left(64);
-    return t;
-}
 
 QVariantMap Lib4DICOM::makePatientFromStrings(const QString& fullName,
     const QString& birthInput,
@@ -86,9 +60,9 @@ QVariantMap Lib4DICOM::makePatientFromStrings(const QString& fullName,
 {
     Patient p;
     p.fullName = fullName.trimmed().isEmpty() ? QStringLiteral("--") : fullName.trimmed();
-    p.birthYear = normalizeBirthYear(birthInput);
-    p.sex = normalizeSex(sexInput);
-    p.patientID = normalizeID(patientID);
+    p.birthYear = (birthInput);
+    p.sex = (sexInput);
+    p.patientID = (patientID);
 
     qDebug().noquote() << "[Lib4DICOM] Converted patient:"
         << "fullName=" << p.fullName
@@ -116,52 +90,6 @@ void Lib4DICOM::logSelectedFileAndPatient(const QString& filePath,
         << "sex =" << (sex.isEmpty() ? "--" : sex);
 }
 
-// ---------------- ФС пациента/исследования ----------------
-QString Lib4DICOM::makeSafeFolderName(const QString& s)
-{
-    QString t = s.trimmed();
-    t.replace(QRegularExpression(R"([\\\/\:\*\?\"\<\>\|\n\r\t])"), "_");
-    t.replace(QRegularExpression(R"(\s+)"), " ");
-    t.replace(' ', '_');
-    const int kMax = 80;
-    if (t.size() > kMax) t = t.left(kMax);
-    if (t.isEmpty()) t = "Unnamed";
-    return t;
-}
-
-QString Lib4DICOM::ensurePatientFolder(const QString& fullName,
-    const QString& birthYearNormalized)
-{
-    const QString root = QCoreApplication::applicationDirPath() + "/patients";
-    QDir rootDir(root);
-    if (!rootDir.exists() && !rootDir.mkpath(".")) {
-        qWarning().noquote() << "[Lib4DICOM] ensurePatientFolder: cannot create root:" << root;
-        return {};
-    }
-
-    const QString safeName = makeSafeFolderName(fullName.isEmpty() ? "Unnamed" : fullName);
-    const QString yearPart = (birthYearNormalized.size() == 4) ? birthYearNormalized : QStringLiteral("----");
-
-    QString base = safeName + "_" + yearPart;
-    QString candidate = root + "/" + base;
-
-    int n = 2;
-    while (QDir(candidate).exists()) {
-        candidate = root + "/" + base + "_" + QString::number(n++);
-        if (n > 9999) {
-            qWarning() << "[Lib4DICOM] ensurePatientFolder: too many duplicates for" << base;
-            return {};
-        }
-    }
-
-    if (!QDir().mkpath(candidate)) {
-        qWarning().noquote() << "[Lib4DICOM] ensurePatientFolder: failed to create:" << candidate;
-        return {};
-    }
-
-    qDebug().noquote() << "[Lib4DICOM] ensurePatientFolder: created ->" << candidate;
-    return candidate;
-}
 
 QString Lib4DICOM::generateDicomUID()
 {
@@ -172,35 +100,48 @@ QString Lib4DICOM::generateDicomUID()
 
 QVariantMap Lib4DICOM::createStudyForNewPatient(const QString& fullName,
     const QString& birthYearNormalized,
-    const QString& patientID)
+    const QString& /*patientID*/)
 {
     QVariantMap out;
 
+    // 1) Папка пациента
     const QString patientFolder = ensurePatientFolder(fullName, birthYearNormalized);
     if (patientFolder.isEmpty()) {
         qWarning().noquote() << "[Lib4DICOM] createStudyForNewPatient: patient folder not created";
+        out["ok"] = false;
+        out["error"] = "patient folder not created";
         return out;
     }
     out["patientFolder"] = patientFolder;
 
-    const QString safeID = normalizeID(patientID);
+    // 2) Имя исследования = <ИмяПациента>_<Дата>_<Метка>
     const QString dateStr = QDate::currentDate().toString("yyyyMMdd");
-    const QString base = safeID + "_" + dateStr;
+    const QString safeName = (fullName.isEmpty() ? "Unnamed" : fullName);
+    const QString safeLabel = (m_studyLabel.isEmpty() ? "Study" : m_studyLabel);
 
-    QString studyFolder = patientFolder + "/" + base;
+    const QString base = QString("%1_%2_%3").arg(safeName, dateStr, safeLabel);
+
+    // 3) Создание папки исследования с авто-нумерацией
+    QString studyFolder = QDir(patientFolder).absoluteFilePath(base);
     int n = 2;
-    while (QDir(studyFolder).exists()) {
-        studyFolder = patientFolder + "/" + base + "_" + QString::number(n++);
-        if (n > 9999) {
-            qWarning().noquote() << "[Lib4DICOM] createStudyForNewPatient: too many duplicates for study";
-            return out;
-        }
+    while (QDir(studyFolder).exists() && n <= 9999) {
+        studyFolder = QDir(patientFolder).absoluteFilePath(base + "_" + QString::number(n++));
     }
-    if (!QDir().mkpath(studyFolder)) {
-        qWarning().noquote() << "[Lib4DICOM] createStudyForNewPatient: failed to create study folder:" << studyFolder;
+    if (n > 9999) {
+        qWarning().noquote() << "[Lib4DICOM] createStudyForNewPatient: too many duplicates for study base:" << base;
+        out["ok"] = false;
+        out["error"] = "too many duplicates for study";
         return out;
     }
 
+    if (!QDir().mkpath(studyFolder)) {
+        qWarning().noquote() << "[Lib4DICOM] createStudyForNewPatient: failed to create study folder:" << studyFolder;
+        out["ok"] = false;
+        out["error"] = "failed to create study folder";
+        return out;
+    }
+
+    // 4) UID исследования
     const QString studyUID = generateDicomUID();
 
     qDebug().noquote() << "[Lib4DICOM] Study created:"
@@ -209,12 +150,14 @@ QVariantMap Lib4DICOM::createStudyForNewPatient(const QString& fullName,
         << "\n  studyName     =" << QFileInfo(studyFolder).fileName()
         << "\n  studyUID      =" << studyUID;
 
+    out["ok"] = true;
     out["studyFolder"] = studyFolder;
     out["studyName"] = QFileInfo(studyFolder).fileName();
     out["studyUID"] = studyUID;
     out["patientFolder"] = patientFolder;
     return out;
 }
+
 
 // ---------------- Загрузка изображения ----------------
 QImage Lib4DICOM::loadImageFromFile(const QString& localPath)
@@ -256,31 +199,6 @@ QImage Lib4DICOM::toRgb888(const QImage& src)
     return src.convertToFormat(QImage::Format_RGB888);
 }
 
-
-// ---------------- Хелперы преобразования к DICOM-форматам ----------------
-QString Lib4DICOM::toDicomPN(const QString& fullName)
-{
-    QString s = fullName.trimmed();
-    s.replace(QRegularExpression(R"(\s+)"), " ");
-    s.replace(' ', '^');              // Иванов Иван -> Иванов^Иван
-    if (s.isEmpty()) s = "--";
-    return s;
-}
-
-QString Lib4DICOM::toDicomDA(const QString& birthInput)
-{
-    QString d = birthInput;
-    d.remove(QRegularExpression(R"([^0-9])"));
-    if (d.size() == 4 || d.size() == 8) return d;   // "YYYY" или "YYYYMMDD"
-    return {};
-}
-
-QString Lib4DICOM::toDicomSex(const QString& sexInput)
-{
-    const QString s = normalizeSex(sexInput);
-    if (s == "M" || s == "F" || s == "O") return s;
-    return "O";
-}
 
 // ---------------- Комбайн с демографией ----------------
 QVariantMap Lib4DICOM::convertAndSaveImageAsDicom(const QString& imagePath,
@@ -415,7 +333,6 @@ void Lib4DICOM::scanPatients() {
     emit patientModelChanged();
 }
 
-
 // ---------------- Stub DICOM в корне папки пациента ----------------
 QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder,
     const QString& patientID,
@@ -429,11 +346,11 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder,
     }
 
     // Нормализованные строки (UTF-8)
-    const QByteArray baPN = toDicomPN(patientName).toUtf8();
-    const QByteArray baPID = normalizeID(patientID).toUtf8();
-    const QString    da = toDicomDA(patientBirth);
+    const QByteArray baPN = (patientName).toUtf8();
+    const QByteArray baPID = (patientID).toUtf8();
+    const QString    da = (patientBirth);
     const QByteArray baDA = da.toUtf8();
-    const QByteArray baSex = toDicomSex(patientSex).toUtf8();
+    const QByteArray baSex = (patientSex).toUtf8();
 
     // UID'ы и время/дата
     const QString studyUID = generateDicomUID();
@@ -494,7 +411,7 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder,
     ds->putAndInsertString(DCM_SeriesDescription, "PATIENT_STUB");
 
     // Имя файла с защитой от коллизий
-    QString base = normalizeID(patientID);
+    QString base = (patientID);
     if (base.isEmpty()) base = "--";
     QString fileName = base + "_patient.dcm";
     QString absPath = QDir(patientFolder).absoluteFilePath(fileName);
@@ -522,7 +439,6 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder,
     }
     return out;
 }
-
 
 
 // ---------------- Сохранение DICOM (SC) — полная версия с демографией ----------------
@@ -555,15 +471,15 @@ QVariantMap Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images,
     const QString studyUID = studyUIDIn.isEmpty() ? generateDicomUID() : studyUIDIn;
     const QString seriesUID = generateDicomUID();
 
-    const QString idToken = patientID.isEmpty() ? QStringLiteral("--") : normalizeID(patientID);
-    const QString seriesToken = seriesName.isEmpty() ? QStringLiteral("SER") : normalizeID(seriesName);
+    const QString idToken = patientID.isEmpty() ? QStringLiteral("--") : patientID;
+    const QString seriesToken = seriesName.isEmpty() ? QStringLiteral("SER") : seriesName;
 
     // Демография: используем UTF-8 и объявляем SpecificCharacterSet
-    const QByteArray baPN = toDicomPN(patientName).toUtf8();
+    const QByteArray baPN = (patientName).toUtf8();
     const QByteArray baPID = idToken.toUtf8();
-    const QString    da = toDicomDA(patientBirth);
+    const QString    da = patientBirth;
     const QByteArray baDA = da.toUtf8();               // может быть пустым
-    const QByteArray baSex = toDicomSex(patientSex).toUtf8();
+    const QByteArray baSex = (patientSex).toUtf8();
 
     // Хелпер подготовки «плотного» буфера
     auto makeDenseBuffer = [](const QImage& in,
@@ -754,32 +670,73 @@ QVariantMap Lib4DICOM::getPatientDemographics(int index) const {
     return out;
 }
 
-
 QVariantMap Lib4DICOM::createStudyInPatientFolder(const QString& patientFolder,
-    const QString& patientID) {
+    const QString& /*patientID*/) {
     QVariantMap out;
+
     if (patientFolder.isEmpty() || !QDir(patientFolder).exists()) {
-        out["ok"] = false; out["error"] = "patient folder does not exist"; return out;
+        out["ok"] = false;
+        out["error"] = "patient folder does not exist";
+        return out;
     }
 
-    const QString safeID = normalizeID(patientID);
-    const QString dateStr = QDate::currentDate().toString("yyyyMMdd");
-    const QString base = safeID + "_" + dateStr;
+    // === Извлечь "имя пациента" из имени папки пациента ===
+    // Папка формируется как: <SafeName>_<YYYY|----> [возможен суффикс _N для дубликатов]
+    QString dirName = QFileInfo(patientFolder).fileName();
 
+    // убрать возможный суффикс "_N" в конце
+    dirName.remove(QRegularExpression(R"(_\d{1,4}$)"));
+
+    // убрать хвост "_YYYY" или "_----"
+    int us = dirName.lastIndexOf('_');
+    if (us > 0) {
+        const QString tail = dirName.mid(us + 1);
+        const bool isYear4 = (tail.size() == 4 &&
+            tail.at(0).isDigit() && tail.at(1).isDigit() &&
+            tail.at(2).isDigit() && tail.at(3).isDigit());
+        if (tail == "----" || isYear4) {
+            dirName = dirName.left(us);
+        }
+    }
+
+    const QString safeName = safeNameForPath(dirName.isEmpty() ? "Unnamed" : dirName);
+    const QString dateStr = QDate::currentDate().toString("yyyyMMdd");
+    const QString safeLabel = safeNameForPath(m_studyLabel.isEmpty() ? "Study" : m_studyLabel);
+
+    // Имя исследования: <ИмяПациента>_<Дата>_<Метка>
+    const QString base = QString("%1_%2_%3").arg(safeName, dateStr, safeLabel);
+
+    // === Создание папки исследования с авто-нумерацией ===
     QString studyFolder = QDir(patientFolder).absoluteFilePath(base);
     int n = 2;
     while (QDir(studyFolder).exists() && n <= 9999) {
         studyFolder = QDir(patientFolder).absoluteFilePath(base + "_" + QString::number(n++));
     }
-    if (!QDir().mkpath(studyFolder)) {
-        out["ok"] = false; out["error"] = "failed to create study folder"; return out;
+    if (n > 9999) {
+        out["ok"] = false;
+        out["error"] = "too many duplicates for study";
+        return out;
     }
+
+    if (!QDir().mkpath(studyFolder)) {
+        out["ok"] = false;
+        out["error"] = "failed to create study folder";
+        return out;
+    }
+
+    const QString studyUID = generateDicomUID();
+
+    qDebug().noquote() << "[Lib4DICOM] Study created:"
+        << "\n  patientFolder =" << patientFolder
+        << "\n  studyFolder   =" << studyFolder
+        << "\n  studyName     =" << QFileInfo(studyFolder).fileName()
+        << "\n  studyUID      =" << studyUID;
 
     out["ok"] = true;
     out["patientFolder"] = patientFolder;
     out["studyFolder"] = studyFolder;
     out["studyName"] = QFileInfo(studyFolder).fileName();
-    out["studyUID"] = generateDicomUID();
+    out["studyUID"] = studyUID;
     return out;
 }
 
@@ -897,4 +854,46 @@ QVariantMap Lib4DICOM::readDemographicsFromFile(const QString& dcmPath) const {
     out["patientID"] = q(DCM_PatientID);
     out["ok"] = true;
     return out;
+}
+
+QString Lib4DICOM::ensurePatientFolder(const QString& fullName,
+    const QString& birthYear)
+{
+    const QString root = QCoreApplication::applicationDirPath() + "/patients";
+    QDir rootDir(root);
+    if (!rootDir.exists() && !rootDir.mkpath(".")) {
+        qWarning().noquote() << "[Lib4DICOM] ensurePatientFolder: cannot create root:" << root;
+        return {};
+    }
+
+    const QString namePart = safeNameForPath(fullName.isEmpty() ? QStringLiteral("Unnamed") : fullName);
+    const QString yearPart = birthYear.isEmpty() ? QStringLiteral("----") : birthYear;
+
+    QString base = namePart + "_" + yearPart;
+    QString candidate = root + "/" + base;
+
+    int n = 2;
+    while (QDir(candidate).exists()) {
+        candidate = root + "/" + base + "_" + QString::number(n++);
+        if (n > 9999) {
+            qWarning() << "[Lib4DICOM] ensurePatientFolder: too many duplicates for" << base;
+            return {};
+        }
+    }
+
+    if (!QDir().mkpath(candidate)) {
+        qWarning().noquote() << "[Lib4DICOM] ensurePatientFolder: failed to create:" << candidate;
+        return {};
+    }
+
+    qDebug().noquote() << "[Lib4DICOM] ensurePatientFolder: created ->" << candidate;
+    return candidate;
+}
+
+QString Lib4DICOM::safeNameForPath(const QString& s)
+{
+    QString t = s.trimmed();
+    if (t.isEmpty()) return QStringLiteral("Unnamed");
+    t.replace(' ', '_');  // только пробел -> подчёркивание
+    return t;
 }
