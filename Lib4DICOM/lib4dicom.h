@@ -111,7 +111,6 @@ private:
     // ===== Хелперы без «нормализации» =====
     static QString generateDicomUID();
     static QString decodeDicomText(const OFString& value, const OFString& specificCharacterSet);
-    static QImage  toRgb888(const QImage& src);
     static QString safeNameForPath(const QString& s);
 
     QList<Patient> m_patients;

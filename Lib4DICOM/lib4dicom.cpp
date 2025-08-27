@@ -8,7 +8,6 @@
 #include <QTime>
 #include <QDateTime>
 #include <QByteArray>
-#include <QBuffer>
 #include <QImageReader>
 #include <QDebug>
 #include <QRegularExpression>
@@ -17,8 +16,7 @@
 #include <dcmtk/dcmdata/dctk.h>
 #include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcuid.h>
-#include <dcmtk/dcmdata/dcvrda.h>
-#include <dcmtk/dcmdata/dcvrtm.h>
+
 
 // ---------------- Конструктор ----------------
 Lib4DICOM::Lib4DICOM(QObject* parent) : QAbstractListModel(parent) {}
@@ -191,14 +189,6 @@ QVector<QImage> Lib4DICOM::loadImageVectorFromFile(const QString& localPath)
         result.push_back(img);
     return result;
 }
-
-// ---------------- Хелпер пиксельного формата ----------------
-QImage Lib4DICOM::toRgb888(const QImage& src)
-{
-    if (src.format() == QImage::Format_RGB888) return src;
-    return src.convertToFormat(QImage::Format_RGB888);
-}
-
 
 // ---------------- Комбайн с демографией ----------------
 QVariantMap Lib4DICOM::convertAndSaveImageAsDicom(const QString& imagePath,
