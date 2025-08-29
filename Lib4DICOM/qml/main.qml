@@ -32,12 +32,6 @@ ApplicationWindow {
     Component {
         id: startPage
         Page {
-            Component.onCompleted: {
-                if (appLogic && appLogic.scanPatients) {
-                    console.log("[QML] auto-scan on page start")
-                    appLogic.scanPatients()
-                }
-            }
 
             header: ToolBar {
                 RowLayout {

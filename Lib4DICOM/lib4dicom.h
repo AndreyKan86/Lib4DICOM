@@ -11,6 +11,17 @@
 // DCMTK: для OFString, используемого в decodeDicomText(...)
 #include <dcmtk/ofstd/ofstring.h>
 
+struct Patient {
+    QString fullName;        // "Иванов Иван"
+    QString birthYear;       // "YYYY" (для отображения/папок)
+    QString birthRaw;        // "YYYYMMDD" или "YYYY" (как есть из DICOM) — опционально
+    QString sex;             // "M"/"F"/"O"
+    QString patientID;       // "12345"
+
+    QString sourceFilePath;  // откуда прочитан (для scan/поиска)
+    QString patientFolder;   // корневая папка пациента (кеш, не обязателен)
+};
+
 class LIB4DICOM_EXPORT Lib4DICOM : public QAbstractListModel {
     Q_OBJECT
         Q_PROPERTY(QAbstractItemModel* patientModel READ patientModel NOTIFY patientModelChanged)
@@ -28,7 +39,6 @@ public:
         if (v.trimmed().isEmpty()) v = "Study";
         if (v == m_studyLabel) return;
         m_studyLabel = v;
-        emit studyLabelChanged();
     }
 
     // ==== QAbstractListModel ====
@@ -40,7 +50,7 @@ public:
     QAbstractItemModel* patientModel();
     Q_INVOKABLE void scanPatients();
 
-    Q_INVOKABLE void logSelectedFileAndPatient(const QString& filePath,
+    Q_INVOKABLE void TESTlogSelectedFileAndPatient(const QString& filePath,
         const QString& fullName,
         const QString& birthYear,
         const QString& sex);
@@ -51,8 +61,8 @@ public:
         const QString& patientID);
 
     // Загрузка изображения
-    Q_INVOKABLE QImage          loadImageFromFile(const QString& localPath);
-    Q_INVOKABLE QVector<QImage> loadImageVectorFromFile(const QString& localPath);
+    Q_INVOKABLE QImage          TESTloadImageFromFile(const QString& localPath);
+    Q_INVOKABLE QVector<QImage> TESTloadImageVectorFromFile(const QString& localPath);
 
     // ФС для пациента/исследования (БЕЗ нормализации имён/символов)
     Q_INVOKABLE QString     ensurePatientFolder(const QString& fullName,
@@ -100,18 +110,13 @@ signals:
     void studyLabelChanged();
 
 private:
-    struct Patient {
-        QString fullName;
-        QString birthYear;
-        QString sex;
-        QString patientID;
-        QString sourceFilePath;
-    };
+
 
     // ===== Хелперы без «нормализации» =====
     static QString generateDicomUID();
+    static Patient patientFromMap(const QVariantMap& m);
+    static QVariantMap patientToMap(const Patient& p);
     static QString decodeDicomText(const OFString& value, const OFString& specificCharacterSet);
-    static QString safeNameForPath(const QString& s);
 
     QList<Patient> m_patients;
     QString m_studyLabel = "Study";

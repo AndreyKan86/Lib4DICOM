@@ -70,7 +70,7 @@
     <ClCompile>
       <AdditionalIncludeDirectories>C:\Programs\DCMTK_MD\include;C:\Files\Work\Danil\Lib4DICOM\Lib4DICOM</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>LIB4DICOM_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Programs\DCMTK_MD\lib;C:\Files\Work\Danil\Lib4DICOM\x64\Debug</AdditionalLibraryDirectories>
