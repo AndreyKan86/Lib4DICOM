@@ -4,7 +4,6 @@ import QtQuick.Layouts 1.15
 import QtQuick.Dialogs
 import Qt.labs.qmlmodels 1.0
 
-
 ApplicationWindow {
     id: win
     width: 720
@@ -32,7 +31,6 @@ ApplicationWindow {
     Component {
         id: startPage
         Page {
-
             header: ToolBar {
                 RowLayout {
                     anchors.fill: parent
@@ -77,7 +75,7 @@ ApplicationWindow {
                     property color gridColor: "#c7cbd1"
                     property int nameW: width - yearW - sexW - 2*sepW
 
-                    // --- недостающая палитра для футера/полей (чтоб не было ReferenceError) ---
+                    // --- палитра для футера/полей ---
                     property color uiPanelBg:       "#f7f8fa"
                     property color uiText:          "#1f2328"
                     property color uiTextHint:      "#6b7280"
@@ -173,7 +171,7 @@ ApplicationWindow {
                                 clip: true
                                 interactive: true
 
-                                // строка "Новый пациент" — на всю ширину; подсветка только при выборе
+                                // строка "Новый пациент"
                                 header: Rectangle {
                                     width: patientsList.width
                                     height: 36
@@ -581,9 +579,8 @@ ApplicationWindow {
             }
 
             ColumnLayout {
-                //anchors.fill: parent
                 anchors.left: parent.left
-                anchors.right: parent.right  
+                anchors.right: parent.right
                 anchors.margins: 16
                 spacing: 12
                 Layout.alignment: Qt.AlignTop
@@ -617,16 +614,10 @@ ApplicationWindow {
                             text: pageNew.pBirth
                             enabled: !pageNew.existingMode
                             readOnly: pageNew.existingMode
-
-                            // ограничение длины
                             maximumLength: 4
-
-                            // разрешаем только цифры
                             validator: IntValidator { bottom: 0; top: 9999 }
-
                             onTextChanged: if (!pageNew.existingMode) pageNew.pBirth = text
                         }
-
 
                         Label { text: "Пол:" }
                         ComboBox {
@@ -669,13 +660,9 @@ ApplicationWindow {
                             Layout.fillWidth: true
                             placeholderText: "Исследование"
                             text: pageNew.pStudyLabel
-
                             onTextChanged: {
-                                // Оставляем только буквы, цифры и пробелы
                                 let clean = text.replace(/[^a-zA-Zа-яА-Я0-9 ]/g, "")
-                                if (clean !== text) {
-                                    text = clean
-                                }
+                                if (clean !== text) text = clean
                                 pageNew.pStudyLabel = text
                             }
                         }
@@ -708,21 +695,18 @@ ApplicationWindow {
                     nameFilters: [ "Изображения (*.bmp *.jpeg *.jpg *.png)", "Все файлы (*)" ]
 
                     onAccepted: {
-                        // 1) URL из доступного свойства (Qt 5/6)
                         var url = null
-                        if (fileDialog.selectedFile)                 url = fileDialog.selectedFile         // Qt 6
-                        else if (fileDialog.fileUrl)                 url = fileDialog.fileUrl              // Qt 5.15
+                        if (fileDialog.selectedFile)                 url = fileDialog.selectedFile
+                        else if (fileDialog.fileUrl)                 url = fileDialog.fileUrl
                         else if (fileDialog.currentFile)             url = fileDialog.currentFile
                         else if (fileDialog.selectedFiles && fileDialog.selectedFiles.length > 0)
                             url = fileDialog.selectedFiles[0]
                         else if (fileDialog.fileUrls && fileDialog.fileUrls.length > 0)
                             url = fileDialog.fileUrls[0]
 
-                        // 2) URL -> локальный путь
                         var localPath = ""
-                        if (url && url.toLocalFile) {
-                            localPath = url.toLocalFile()
-                        } else if (url && url.toString) {
+                        if (url && url.toLocalFile)       localPath = url.toLocalFile()
+                        else if (url && url.toString) {
                             var s = url.toString()
                             if (s.startsWith("file:///"))      localPath = s.substr(8)
                             else if (s.startsWith("file://"))  localPath = s.substr(7)
@@ -737,10 +721,7 @@ ApplicationWindow {
                         pageNew.pFile = localPath
                         filePathField.text = localPath
                         console.log("[QML] chosen image:", localPath)
-
-                        // ВАЖНО: больше здесь НИЧЕГО не делаем — исследование создадим по кнопке "Далее"
                     }
-
 
                     onRejected: console.log("[QML] FileDialog canceled")
                 }
@@ -752,130 +733,117 @@ ApplicationWindow {
 
                     Button {
                         text: "Далее"
+                        onClicked: {
+                            // >>> Перед любыми действиями задаём метку исследования для C++
+                            if (appLogic && appLogic.studyLabel !== undefined)
+                                appLogic.studyLabel = pageNew.pStudyLabel || "Study"
 
-                    onClicked: {
-                        // >>> Перед любыми действиями задаём метку исследования для C++
-                        if (appLogic && appLogic.studyLabel !== undefined)
-                            appLogic.studyLabel = pageNew.pStudyLabel || "Study"
-
-                        if (pageNew.existingMode) {
-                            // ====== Существующий пациент ======
-                            // Убедимся, что знаем папку пациента и его ID/демографию
-                            if ((!pageNew.pPatientFolder || !pageNew.pPatientID) &&
-                                appLogic && appLogic.getPatientDemographics && pageNew.existingIndex >= 0) {
-                                const g = appLogic.getPatientDemographics(pageNew.existingIndex)
-                                if (g && g.ok) {
-                                    pageNew.pPatientFolder = pageNew.pPatientFolder || g.patientFolder
-                                    pageNew.pPatientID     = pageNew.pPatientID     || g.patientID
-                                    pageNew.pName          = pageNew.pName          || g.fullName
-                                    pageNew.pBirth         = pageNew.pBirth         || g.birthYear
-                                    pageNew.pSex           = pageNew.pSex           || g.sex
-                                } else {
-                                    console.warn("[QML] getPatientDemographics failed:", g ? g.error : "undefined")
-                                    return
+                            if (pageNew.existingMode) {
+                                // ====== Существующий пациент ======
+                                if ((!pageNew.pPatientFolder || !pageNew.pPatientID) &&
+                                    appLogic && appLogic.getPatientDemographics && pageNew.existingIndex >= 0) {
+                                    const g = appLogic.getPatientDemographics(pageNew.existingIndex)
+                                    if (g && g.ok) {
+                                        pageNew.pPatientFolder = pageNew.pPatientFolder || g.patientFolder
+                                        pageNew.pPatientID     = pageNew.pPatientID     || g.patientID
+                                        pageNew.pName          = pageNew.pName          || g.fullName
+                                        pageNew.pBirth         = pageNew.pBirth         || g.birthYear
+                                        pageNew.pSex           = pageNew.pSex           || g.sex
+                                    } else {
+                                        console.warn("[QML] getPatientDemographics failed:", g ? g.error : "undefined")
+                                        return
+                                    }
                                 }
-                            }
 
-                            if (!pageNew.pPatientFolder || !pageNew.pPatientID) {
-                                console.warn("[QML] patientFolder or patientID is empty")
-                                return
-                            }
-
-                            // 1) Создаём исследование ТОЛЬКО сейчас
-                            const study = appLogic.createStudyInPatientFolder(pageNew.pPatientFolder, pageNew.pPatientID)
-                            if (!study || !study.ok) {
-                                console.warn("[QML] Failed to create study:", study ? study.error : "undefined")
-                                return
-                            }
-
-                            // 2) Если выбран файл — конвертируем в DICOM
-                            if (pageNew.pFile && pageNew.pFile.length > 0 &&
-                                appLogic && appLogic.convertAndSaveImageAsDicom) {
-
-                                const res = appLogic.convertAndSaveImageAsDicom(
-                                    pageNew.pFile,
-                                    study.studyFolder,
-                                    pageNew.pPatientID,
-                                    "SER01",
-                                    study.studyUID,
-                                    pageNew.pName,
-                                    pageNew.pBirth,
-                                    pageNew.pSex
-                                )
-                                console.log("[QML] DICOM save (existing):", JSON.stringify(res))
-                            } else {
-                                console.log("[QML] No file selected; study folder created:", study.studyFolder)
-                            }
-
-                        } else {
-                            // ====== Новый пациент ======
-                            let patient = null
-                            if (appLogic && appLogic.makePatientFromStrings) {
-                                patient = appLogic.makePatientFromStrings(
-                                    pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
-                                )
-                            } else {
-                                console.warn("appLogic.makePatientFromStrings не найден")
-                                return
-                            }
-
-                            let study = null
-                            if (patient && appLogic && appLogic.createStudyForNewPatient) {
-                                study = appLogic.createStudyForNewPatient(
-                                    patient.fullName, patient.birthYear, patient.patientID
-                                )
-                                if (!study || !study.studyFolder) {
-                                    console.warn("[QML] Failed to create study folder")
+                                if (!pageNew.pPatientFolder || !pageNew.pPatientID) {
+                                    console.warn("[QML] patientFolder or patientID is empty")
                                     return
                                 }
 
-                                // Stub DICOM (демография)
-                                if (appLogic && appLogic.createPatientStubDicom && study.patientFolder) {
-                                    const stub = appLogic.createPatientStubDicom(
-                                        study.patientFolder,
-                                        patient.patientID,
-                                        patient.fullName,
-                                        patient.birthYear,
-                                        patient.sex
+                                // 1) Создаём исследование в папке
+                                const study = appLogic.createStudyInPatientFolder(pageNew.pPatientFolder, pageNew.pPatientID)
+                                if (!study || !study.ok) {
+                                    console.warn("[QML] Failed to create study:", study ? study.error : "undefined")
+                                    return
+                                }
+
+                                // 2) Если выбран файл — конвертируем в DICOM
+                                if (pageNew.pFile && pageNew.pFile.length > 0 &&
+                                    appLogic && appLogic.convertAndSaveImageAsDicom) {
+
+                                    const patient = appLogic.makePatientFromStrings(
+                                        pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
                                     )
-                                    if (!stub.ok) console.warn("[QML] Stub DICOM failed:", stub.error)
-                                    else          console.log("[QML] Stub DICOM created:", stub.path)
+
+                                    const res = appLogic.convertAndSaveImageAsDicom(
+                                        pageNew.pFile,          // imagePath
+                                        study.studyFolder,      // studyFolder
+                                        "SER01",                // seriesName
+                                        study.studyUID,         // studyUID
+                                        patient                 // QVariantMap
+                                    )
+                                    console.log("[QML] DICOM save (existing):", JSON.stringify(res))
                                 } else {
-                                    console.warn("[QML] createPatientStubDicom не найден или нет patientFolder")
+                                    console.log("[QML] No file selected; study folder created:", study.studyFolder)
                                 }
+
                             } else {
-                                return
+                                // ====== Новый пациент ======
+                                let patient = null
+                                if (appLogic && appLogic.makePatientFromStrings) {
+                                    patient = appLogic.makePatientFromStrings(
+                                        pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
+                                    )
+                                } else {
+                                    console.warn("appLogic.makePatientFromStrings не найден")
+                                    return
+                                }
+
+                                let study = null
+                                if (patient && appLogic && appLogic.createStudyForNewPatient) {
+                                    study = appLogic.createStudyForNewPatient(patient)
+                                    if (!study || !study.studyFolder) {
+                                        console.warn("[QML] Failed to create study folder")
+                                        return
+                                    }
+
+                                    // Stub DICOM (демография)
+                                    if (appLogic && appLogic.createPatientStubDicom && study.patientFolder) {
+                                        const stub = appLogic.createPatientStubDicom(study.patientFolder, patient)
+                                        if (!stub.ok) console.warn("[QML] Stub DICOM failed:", stub.error)
+                                        else          console.log("[QML] Stub DICOM created:", stub.path)
+                                    } else {
+                                        console.warn("[QML] createPatientStubDicom не найден или нет patientFolder")
+                                    }
+                                } else {
+                                    return
+                                }
+
+                                // Сохраняем файл, если выбран
+                                if (pageNew.pFile && pageNew.pFile.length > 0 &&
+                                    appLogic && appLogic.convertAndSaveImageAsDicom) {
+
+                                    const res = appLogic.convertAndSaveImageAsDicom(
+                                        pageNew.pFile,          // imagePath
+                                        study.studyFolder,      // studyFolder
+                                        "SER01",                // seriesName
+                                        study.studyUID,         // studyUID
+                                        patient                 // QVariantMap
+                                    )
+                                    console.log("[QML] DICOM save (new patient):", JSON.stringify(res))
+                                } else {
+                                    console.log("[QML] No file selected; study folder created:", study.studyFolder)
+                                }
                             }
 
-                            // Сохраняем файл, если выбран
-                            if (pageNew.pFile && pageNew.pFile.length > 0 &&
-                                appLogic && appLogic.convertAndSaveImageAsDicom) {
-
-                                const res = appLogic.convertAndSaveImageAsDicom(
-                                    pageNew.pFile,
-                                    study.studyFolder,
-                                    patient.patientID,
-                                    "SER01",
-                                    study.studyUID,
-                                    patient.fullName,
-                                    patient.birthYear,
-                                    patient.sex
-                                )
-                                console.log("[QML] DICOM save (new patient):", JSON.stringify(res))
-                            } else {
-                                console.log("[QML] No file selected; study folder created:", study.studyFolder)
-                            }
+                            // Очистка и закрытие
+                            pageNew.pName = ""
+                            pageNew.pBirth = ""
+                            pageNew.pSex = sexCombo.currentValue
+                            pageNew.pFile = ""
+                            pageNew.pPatientID = ""
+                            win.close()
                         }
-
-                        // Очистка и закрытие
-                        pageNew.pName = ""
-                        pageNew.pBirth = ""
-                        pageNew.pSex = sexCombo.currentValue
-                        pageNew.pFile = ""
-                        pageNew.pPatientID = ""
-                        win.close()
-                    }
-
                     }
                 }
             }

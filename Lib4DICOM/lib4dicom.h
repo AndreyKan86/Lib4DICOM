@@ -67,38 +67,31 @@ public:
     // ФС для пациента/исследования (БЕЗ нормализации имён/символов)
     Q_INVOKABLE QString     ensurePatientFolder(const QString& fullName,
         const QString& birthYear);
-    Q_INVOKABLE QVariantMap createStudyForNewPatient(const QString& fullName,
-        const QString& birthYear,
-        const QString& patientID);
+
+
+    Q_INVOKABLE QVariantMap createStudyForNewPatient(const QVariantMap& patient);
+
+
     Q_INVOKABLE QVariantMap createStudyInPatientFolder(const QString& patientFolder,
         const QString& patientID);
 
     // Полная версия: сохранение DICOM (SC) с демографией
     Q_INVOKABLE QVariantMap saveImagesAsDicom(const QVector<QImage>& images,
         const QString& outFolder,
-        const QString& patientID,
         const QString& seriesName,
-        const QString& studyUID,
-        const QString& patientName,
-        const QString& patientBirth,
-        const QString& patientSex);
+        const QString& studyUIDIn,
+        const QVariantMap& patient);
 
     // Комбайн (файл -> DICOM) с демографией
     Q_INVOKABLE QVariantMap convertAndSaveImageAsDicom(const QString& imagePath,
         const QString& studyFolder,
-        const QString& patientID,
         const QString& seriesName,
         const QString& studyUID,
-        const QString& patientName,
-        const QString& patientBirth,
-        const QString& patientSex);
+        const QVariantMap& patient);
 
     // Пустой DICOM (stub) в корне папки пациента с демографией
     Q_INVOKABLE QVariantMap createPatientStubDicom(const QString& patientFolder,
-        const QString& patientID,
-        const QString& patientName,
-        const QString& patientBirth,
-        const QString& patientSex);
+        const QVariantMap& patient);
 
     // Утилиты для UI
     Q_INVOKABLE QVariantMap getPatientDemographics(int index) const; // fullName, birthYear, sex, patientID, patientFolder
