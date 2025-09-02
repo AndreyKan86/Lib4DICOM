@@ -604,6 +604,7 @@ ApplicationWindow {
                             onTextChanged: if (!pageNew.existingMode) pageNew.pName = text
                             enabled: !pageNew.existingMode
                             readOnly: pageNew.existingMode
+                            maximumLength: 50 
                         }
 
                         Label { text: "Год рождения:" }

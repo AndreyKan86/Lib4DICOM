@@ -16,6 +16,7 @@
 #include <dcmtk/dcmdata/dctk.h>
 #include <dcmtk/dcmdata/dcdeftag.h>
 #include <dcmtk/dcmdata/dcuid.h>
+#include <dcmtk/ofstd/ofstring.h>
 
 
 // ---------------- Конструктор ----------------
@@ -121,8 +122,8 @@ QVariantMap Lib4DICOM::createStudyForNewPatient(const QVariantMap& patientMap)
 
     // 2) Имя исследования = <ИмяПациента>_<Дата>_<Метка>
     const QString dateStr = QDate::currentDate().toString("yyyyMMdd");
-    const QString safeName = p.fullName.isEmpty() ? "Unnamed" : p.fullName;
-    const QString safeLabel = m_studyLabel.isEmpty() ? "Study" : m_studyLabel;
+    const QString safeName = sanitizeName(p.fullName.isEmpty() ? "Unnamed" : p.fullName);
+    const QString safeLabel = sanitizeName(m_studyLabel.isEmpty() ? "Study" : m_studyLabel);
     const QString base = QString("%1_%2_%3").arg(safeName, dateStr, safeLabel);
 
     // 3) Создание папки исследования с авто-нумерацией
@@ -154,6 +155,7 @@ QVariantMap Lib4DICOM::createStudyForNewPatient(const QVariantMap& patientMap)
     out["patientFolder"] = patientFolder;
     return out;
 }
+
 
 // ---------------- Загрузка изображения ----------------
 QImage Lib4DICOM::TESTloadImageFromFile(const QString& localPath)
@@ -594,13 +596,10 @@ QVariantMap Lib4DICOM::createStudyInPatientFolder(const QString& patientFolder,
     }
 
     // === Извлечь "имя пациента" из имени папки пациента ===
-    // Папка формируется как: <SafeName>_<YYYY|----> [возможен суффикс _N для дубликатов]
     QString dirName = QFileInfo(patientFolder).fileName();
 
-    // убрать возможный суффикс "_N" в конце
     dirName.remove(QRegularExpression(R"(_\d{1,4}$)"));
 
-    // убрать хвост "_YYYY" или "_----"
     int us = dirName.lastIndexOf('_');
     if (us > 0) {
         const QString tail = dirName.mid(us + 1);
@@ -612,14 +611,12 @@ QVariantMap Lib4DICOM::createStudyInPatientFolder(const QString& patientFolder,
         }
     }
 
-    const QString safeName = dirName.isEmpty() ? "Unnamed" : dirName;
+    const QString safeName = sanitizeName(dirName.isEmpty() ? "Unnamed" : dirName);
     const QString dateStr = QDate::currentDate().toString("yyyyMMdd");
-    const QString safeLabel = m_studyLabel.isEmpty() ? "Study" : m_studyLabel;
+    const QString safeLabel = sanitizeName(m_studyLabel.isEmpty() ? "Study" : m_studyLabel);
 
-    // Имя исследования: <ИмяПациента>_<Дата>_<Метка>
     const QString base = QString("%1_%2_%3").arg(safeName, dateStr, safeLabel);
 
-    // === Создание папки исследования с авто-нумерацией ===
     QString studyFolder = QDir(patientFolder).absoluteFilePath(base);
     int n = 2;
     while (QDir(studyFolder).exists() && n <= 9999) {
@@ -652,6 +649,7 @@ QVariantMap Lib4DICOM::createStudyInPatientFolder(const QString& patientFolder,
     out["studyUID"] = studyUID;
     return out;
 }
+
 
 //Получение пути к DICOM-файлу-заглушке пациента
 QVariantMap Lib4DICOM::findPatientStubByIndex(int index) const {
@@ -780,8 +778,8 @@ QString Lib4DICOM::ensurePatientFolder(const QString& fullName,
         return {};
     }
 
-    const QString namePart = fullName.isEmpty() ? QStringLiteral("Unnamed") : fullName;
-    const QString yearPart = birthYear.isEmpty() ? QStringLiteral("----") : birthYear;
+    const QString namePart = sanitizeName(fullName.isEmpty() ? QStringLiteral("Unnamed") : fullName);
+    const QString yearPart = sanitizeName(birthYear.isEmpty() ? QStringLiteral("----") : birthYear);
 
     QString base = namePart + "_" + yearPart;
     QString candidate = root + "/" + base;
@@ -803,6 +801,7 @@ QString Lib4DICOM::ensurePatientFolder(const QString& fullName,
     qDebug().noquote() << "[Lib4DICOM] ensurePatientFolder: created ->" << candidate;
     return candidate;
 }
+
 
 Patient Lib4DICOM::patientFromMap(const QVariantMap& m) {
     Patient p;
@@ -826,4 +825,29 @@ QVariantMap Lib4DICOM::patientToMap(const Patient& p) {
     m["sourceFilePath"] = p.sourceFilePath;
     m["patientFolder"] = p.patientFolder;
     return m;
+}
+
+
+QString Lib4DICOM::studyLabel() const {
+    return m_studyLabel;
+}
+
+void Lib4DICOM::setStudyLabel(const QString& s) {
+    QString v = s.trimmed().isEmpty() ? "Study" : s;
+    if (v == m_studyLabel) return;
+    m_studyLabel = v;
+    emit studyLabelChanged();   // теперь это корректный вызов сигнала-члена
+}
+
+// Заменяет любые пробелы на "_", убирает опасные для файловой системы символы
+QString Lib4DICOM::sanitizeName(const QString& in)
+{
+    QString s = in.trimmed();
+    // Любые последовательности пробелов/табов/переводов строк -> "_"
+    s.replace(QRegularExpression(R"(\s+)"), "_");
+    // Запрещённые в Windows символы -> "_"
+    s.replace(QRegularExpression(R"([\\/:*?"<>|])"), "_");
+    // Во избежание двойных подчёркиваний
+    s.replace(QRegularExpression(R"(_{2,})"), "_");
+    return s;
 }
