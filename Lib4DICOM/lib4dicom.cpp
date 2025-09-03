@@ -51,11 +51,6 @@ QHash<int, QByteArray> Lib4DICOM::roleNames() const {
     };
 }
 
-//Обертка объекта модели пациентов для QML
-QAbstractItemModel* Lib4DICOM::patientModel() {
-    return this;
-}
-
 //Создание пациента из строк
 QVariantMap Lib4DICOM::makePatientFromStrings(const QString& fullName,
     const QString& birthInput,
@@ -815,18 +810,6 @@ Patient Lib4DICOM::patientFromMap(const QVariantMap& m) {
     return p;
 }
 
-QVariantMap Lib4DICOM::patientToMap(const Patient& p) {
-    QVariantMap m;
-    m["fullName"] = p.fullName;
-    m["birthYear"] = p.birthYear;
-    m["birthRaw"] = p.birthRaw;
-    m["sex"] = p.sex;
-    m["patientID"] = p.patientID;
-    m["sourceFilePath"] = p.sourceFilePath;
-    m["patientFolder"] = p.patientFolder;
-    return m;
-}
-
 
 QString Lib4DICOM::studyLabel() const {
     return m_studyLabel;
@@ -850,4 +833,84 @@ QString Lib4DICOM::sanitizeName(const QString& in)
     // Во избежание двойных подчёркиваний
     s.replace(QRegularExpression(R"(_{2,})"), "_");
     return s;
+}
+
+
+void Lib4DICOM::selectExistingPatient(int index)
+{
+    if (index < 0 || index >= m_patients.size()) {
+        qWarning().noquote() << "[Lib4DICOM] selectExistingPatient: index out of range:" << index;
+        return;
+    }
+
+    const Patient& p = m_patients.at(index);
+
+    // Если уже выбран тот же — можно ничего не делать (опционально)
+    if (m_selectedPatient.patientID == p.patientID &&
+        m_selectedPatient.fullName == p.fullName &&
+        m_selectedPatient.birthYear == p.birthYear &&
+        m_selectedPatient.sex == p.sex) {
+        return;
+    }
+
+    m_selectedPatient = p;
+    emit selectedPatientChanged();
+
+    qDebug().noquote() << "[Lib4DICOM] selected existing patient:"
+        << m_selectedPatient.fullName
+        << m_selectedPatient.birthYear
+        << m_selectedPatient.sex
+        << m_selectedPatient.patientID;
+}
+
+void Lib4DICOM::selectNewPatient(const QVariantMap& patient)
+{
+    Patient p = patientFromMap(patient);
+
+    // Нормализуем чуть-чуть (чтобы «пустота» была однозначной)
+    if (p.fullName.trimmed() == "--") p.fullName.clear();
+    if (p.birthYear.trimmed() == "--") p.birthYear.clear();
+    if (p.sex.trimmed() == "--") p.sex.clear();
+    if (p.patientID.trimmed() == "--") p.patientID.clear();
+
+    m_selectedPatient = std::move(p);
+    emit selectedPatientChanged();
+
+    qDebug().noquote() << "[Lib4DICOM] selected NEW patient:"
+        << m_selectedPatient.fullName
+        << m_selectedPatient.birthYear
+        << m_selectedPatient.sex
+        << m_selectedPatient.patientID;
+}
+
+void Lib4DICOM::clearSelectedPatient()
+{
+    // Сброс до «пустого» — значит «никто не выбран»
+    m_selectedPatient = Patient{};
+    emit selectedPatientChanged();
+    qDebug().noquote() << "[Lib4DICOM] selected patient cleared";
+}
+
+QVariantMap Lib4DICOM::selectedPatient() const
+{
+    // Критерий «ничего не выбрано»: и имя, и ID пустые
+    const bool none =
+        m_selectedPatient.fullName.trimmed().isEmpty() &&
+        m_selectedPatient.patientID.trimmed().isEmpty();
+
+    QVariantMap map;
+    if (none) {
+        map["ok"] = false;
+        return map;
+    }
+
+    map["ok"] = true;
+    map["fullName"] = m_selectedPatient.fullName;
+    map["birthYear"] = m_selectedPatient.birthYear;
+    map["birthRaw"] = m_selectedPatient.birthRaw;
+    map["sex"] = m_selectedPatient.sex;
+    map["patientID"] = m_selectedPatient.patientID;
+    map["sourceFilePath"] = m_selectedPatient.sourceFilePath;
+    map["patientFolder"] = m_selectedPatient.patientFolder;
+    return map;
 }

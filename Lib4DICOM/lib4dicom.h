@@ -25,7 +25,6 @@ class LIB4DICOM_EXPORT Lib4DICOM : public QAbstractListModel {
     Q_OBJECT
 
         // Эти свойства реально используются из QML
-        Q_PROPERTY(QAbstractItemModel* patientModel READ patientModel NOTIFY patientModelChanged)
         Q_PROPERTY(QString studyLabel READ studyLabel WRITE setStudyLabel NOTIFY studyLabelChanged)
 
 public:
@@ -67,17 +66,21 @@ public:
     Q_INVOKABLE QVariantMap findPatientStubByIndex(int index) const; // { ok, patientFolder, stubPath }
     Q_INVOKABLE QVariantMap readDemographicsFromFile(const QString& dcmPath) const; // { ok, patientName, patientBirth, patientSex, patientID }
 
+    //функции для глобальной переменной patient
+    Q_INVOKABLE void selectExistingPatient(int index);
+    Q_INVOKABLE void selectNewPatient(const QVariantMap& patient);
+    Q_INVOKABLE void clearSelectedPatient();
+
+    QVariantMap selectedPatient() const;
+
 signals:
     void patientModelChanged();
+    void selectedPatientChanged();
     void studyLabelChanged();
 
 private:
     // Роли — деталь реализации модели
     enum Roles { FullNameRole = Qt::UserRole + 1, BirthYearRole, SexRole };
-
-    // READ для Q_PROPERTY можно было бы сделать private,
-    // но раз QML активно использует, оставим здесь:
-    QAbstractItemModel* patientModel();
 
     // ==== Остальной API прячем ====
     Q_INVOKABLE void scanPatients(); // сейчас не зовётся из QML
@@ -98,7 +101,7 @@ private:
     // Хелперы/преобразования
     static QString     generateDicomUID();
     static Patient     patientFromMap(const QVariantMap& m);
-    static QVariantMap patientToMap(const Patient& p);
+
 
     // DCMTK helper (реализация в .cpp; здесь только сигнатура)
     static QString decodeDicomText(const OFString& value,
@@ -107,4 +110,8 @@ private:
     // Данные модели
     QList<Patient> m_patients;
     QString m_studyLabel = "Study";
+
+
+    Patient m_selectedPatient{};
+    bool m_hasSelectedPatient = false;
 };

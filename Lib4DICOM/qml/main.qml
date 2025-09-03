@@ -15,7 +15,6 @@ ApplicationWindow {
 
     Connections {
         target: win
-        onProceed: console.log("[QML] proceed:", payload)
     }
 
     // состояние выбора
@@ -166,7 +165,7 @@ ApplicationWindow {
                             ListView {
                                 id: patientsList
                                 width: parent.width
-                                model: appLogic ? appLogic.patientModel : null
+                                model: appLogic ? appLogic : null
                                 boundsBehavior: Flickable.StopAtBounds
                                 clip: true
                                 interactive: true
@@ -203,6 +202,8 @@ ApplicationWindow {
                                             selectedIsNew = true
                                             selectedIndex = -1
                                             patientsList.currentIndex = -1
+                                            if (appLogic && appLogic.clearSelectedPatient)        // NEW
+                                                appLogic.clearSelectedPatient()                    // NEW
                                         }
                                         onDoubleClicked: {
                                             selectedIsNew = true
@@ -250,7 +251,7 @@ ApplicationWindow {
                                             Text {
                                                 anchors.fill: parent
                                                 anchors.margins: 8
-                                                text: fullName
+                                                text: fullName||""
                                                 elide: Text.ElideRight
                                                 verticalAlignment: Text.AlignVCenter
                                                 color: "black"
@@ -264,7 +265,7 @@ ApplicationWindow {
                                             color: "transparent"
                                             Text {
                                                 anchors.fill: parent
-                                                text: birthYear
+                                                text: birthYear||""
                                                 horizontalAlignment: Text.AlignHCenter
                                                 verticalAlignment: Text.AlignVCenter
                                                 color: "black"
@@ -278,7 +279,7 @@ ApplicationWindow {
                                             color: "transparent"
                                             Text {
                                                 anchors.fill: parent
-                                                text: sex
+                                                text: sex||""
                                                 horizontalAlignment: Text.AlignHCenter
                                                 verticalAlignment: Text.AlignVCenter
                                                 color: "black"
@@ -302,12 +303,20 @@ ApplicationWindow {
                                             selectedIsNew = false
                                             patientsList.currentIndex = index
                                             selectedIndex = index
+
+                                            if (appLogic && appLogic.selectExistingPatient)       // NEW
+                                                appLogic.selectExistingPatient(index)              // NEW
+
                                         }
 
                                         onDoubleClicked: {
                                             selectedIsNew = false
                                             patientsList.currentIndex = index
                                             selectedIndex = index
+
+                                            if (appLogic && appLogic.selectExistingPatient)       // NEW
+                                                appLogic.selectExistingPatient(index)              // NEW
+
                                             stack.push(nextPage, { existingMode: true, existingIndex: index })
                                         }
                                     }
@@ -389,96 +398,6 @@ ApplicationWindow {
                                 }
 
                                 Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
-
-                                // Пол
-                                Rectangle {
-                                    width: tableFrame.sexW
-                                    height: parent.height
-                                    color: "transparent"
-
-                                    ComboBox {
-                                        id: sexFilter
-                                        anchors.fill: parent
-                                        anchors.margins: 4
-                                        textRole: "text"
-                                        valueRole: "value"
-                                        model: [
-                                            { text: "Все", value: "ALL" },
-                                            { text: "М",   value: "M"   },
-                                            { text: "Ж",   value: "F"   },
-                                            { text: "Др.", value: "O"   }
-                                        ]
-                                        onCurrentIndexChanged: tableFrame.filterSex = currentValue
-
-                                        contentItem: Text {
-                                            text: sexFilter.displayText
-                                            verticalAlignment: Text.AlignVCenter
-                                            leftPadding: 8; rightPadding: 24
-                                            color: tableFrame.uiText
-                                            elide: Text.ElideRight
-                                        }
-
-                                        indicator: Text {
-                                            text: "\u25BE"
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            anchors.right: parent.right
-                                            anchors.rightMargin: 8
-                                            color: tableFrame.uiTextHint
-                                        }
-
-                                        background: Rectangle {
-                                            radius: 6
-                                            color: tableFrame.uiFieldBg
-                                            border.color: sexFilter.activeFocus ? tableFrame.uiFieldBorderFocus : tableFrame.uiFieldBorder
-                                            border.width: 1
-                                        }
-
-                                        popup: Popup {
-                                            y: sexFilter.height
-                                            width: sexFilter.width
-                                            padding: 0
-                                            implicitHeight: Math.min(list.implicitHeight, 240)
-
-                                            background: Rectangle {
-                                                radius: 6
-                                                color: tableFrame.uiFieldBg
-                                                border.color: tableFrame.uiFieldBorder
-                                                border.width: 1
-                                            }
-
-                                            contentItem: ListView {
-                                                id: list
-                                                clip: true
-                                                implicitHeight: contentHeight
-                                                model: sexFilter.model
-                                                currentIndex: sexFilter.highlightedIndex
-
-                                                delegate: ItemDelegate {
-                                                    width: list.width
-                                                    text: (typeof modelData === "object")
-                                                            ? modelData[sexFilter.textRole]
-                                                            : String(modelData)
-                                                    background: Rectangle {
-                                                        color: pressed ? tableFrame.uiItemPressed
-                                                                       : (hovered ? tableFrame.uiItemHover
-                                                                                  : tableFrame.uiFieldBg)
-                                                    }
-                                                    contentItem: Text {
-                                                        text: parent.text
-                                                        color: tableFrame.uiText
-                                                        elide: Text.ElideRight
-                                                        verticalAlignment: Text.AlignVCenter
-                                                        leftPadding: 8; rightPadding: 8
-                                                    }
-                                                    onClicked: {
-                                                        sexFilter.currentIndex = index
-                                                        sexFilter.popup.close()
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
                             }
 
                             Rectangle {
@@ -631,7 +550,7 @@ ApplicationWindow {
                                 { text: "Женский", value: "F" },
                                 { text: "Другое/не указано", value: "O" }
                             ]
-                            onCurrentIndexChanged: if (!pageNew.existingMode) pageNew.pSex = currentValue
+                            onCurrentIndexChanged: if (!pageNew.existingMode) pageNew.pSex = currentValue || "O"
                             Component.onCompleted: {
                                 if (pageNew.existingMode) {
                                     const v = pageNew.pSex || "O"
@@ -721,10 +640,7 @@ ApplicationWindow {
 
                         pageNew.pFile = localPath
                         filePathField.text = localPath
-                        console.log("[QML] chosen image:", localPath)
                     }
-
-                    onRejected: console.log("[QML] FileDialog canceled")
                 }
 
                 RowLayout {
@@ -732,15 +648,20 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignRight
                     Layout.topMargin: 8
 
+
                     Button {
                         text: "Далее"
                         onClicked: {
-                            // >>> Перед любыми действиями задаём метку исследования для C++
+                            // 0) Метка исследования для C++
                             if (appLogic && appLogic.studyLabel !== undefined)
                                 appLogic.studyLabel = pageNew.pStudyLabel || "Study"
 
                             if (pageNew.existingMode) {
-                                // ====== Существующий пациент ======
+                                // === Существующий пациент ===
+                                if (appLogic && appLogic.selectExistingPatient && pageNew.existingIndex >= 0)
+                                    appLogic.selectExistingPatient(pageNew.existingIndex)     // зафиксировать выбор в C++
+
+                                // Подтянуть недостающую демографию
                                 if ((!pageNew.pPatientFolder || !pageNew.pPatientID) &&
                                     appLogic && appLogic.getPatientDemographics && pageNew.existingIndex >= 0) {
                                     const g = appLogic.getPatientDemographics(pageNew.existingIndex)
@@ -761,21 +682,18 @@ ApplicationWindow {
                                     return
                                 }
 
-                                // 1) Создаём исследование в папке
+                                // 1) Создание исследования в папке пациента
                                 const study = appLogic.createStudyInPatientFolder(pageNew.pPatientFolder, pageNew.pPatientID)
                                 if (!study || !study.ok) {
                                     console.warn("[QML] Failed to create study:", study ? study.error : "undefined")
                                     return
                                 }
 
-                                // 2) Если выбран файл — конвертируем в DICOM
-                                if (pageNew.pFile && pageNew.pFile.length > 0 &&
-                                    appLogic && appLogic.convertAndSaveImageAsDicom) {
-
+                                // 2) Конвертация выбранного файла (если выбран)
+                                if (pageNew.pFile && pageNew.pFile.length > 0 && appLogic && appLogic.convertAndSaveImageAsDicom) {
                                     const patient = appLogic.makePatientFromStrings(
                                         pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
                                     )
-
                                     const res = appLogic.convertAndSaveImageAsDicom(
                                         pageNew.pFile,          // imagePath
                                         study.studyFolder,      // studyFolder
@@ -783,32 +701,36 @@ ApplicationWindow {
                                         study.studyUID,         // studyUID
                                         patient                 // QVariantMap
                                     )
-                                    console.log("[QML] DICOM save (existing):", JSON.stringify(res))
+                                    // console.log("[QML] DICOM save (existing patient):", JSON.stringify(res))
                                 } else {
                                     console.log("[QML] No file selected; study folder created:", study.studyFolder)
                                 }
 
                             } else {
-                                // ====== Новый пациент ======
-                                let patient = null
-                                if (appLogic && appLogic.makePatientFromStrings) {
-                                    patient = appLogic.makePatientFromStrings(
-                                        pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
-                                    )
-                                } else {
+                                // === Новый пациент ===
+                                if (!appLogic || !appLogic.makePatientFromStrings) {
                                     console.warn("appLogic.makePatientFromStrings не найден")
                                     return
                                 }
 
+                                const patient = appLogic.makePatientFromStrings(
+                                    pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
+                                )
+
+                                // Зафиксировать выбор нового пациента в C++
+                                if (appLogic && appLogic.selectNewPatient)
+                                    appLogic.selectNewPatient(patient)
+
+                                // 1) Создание исследования для нового пациента
                                 let study = null
-                                if (patient && appLogic && appLogic.createStudyForNewPatient) {
+                                if (appLogic && appLogic.createStudyForNewPatient) {
                                     study = appLogic.createStudyForNewPatient(patient)
                                     if (!study || !study.studyFolder) {
                                         console.warn("[QML] Failed to create study folder")
                                         return
                                     }
 
-                                    // Stub DICOM (демография)
+                                    // 1a) Stub DICOM (демография)
                                     if (appLogic && appLogic.createPatientStubDicom && study.patientFolder) {
                                         const stub = appLogic.createPatientStubDicom(study.patientFolder, patient)
                                         if (!stub.ok) console.warn("[QML] Stub DICOM failed:", stub.error)
@@ -820,10 +742,8 @@ ApplicationWindow {
                                     return
                                 }
 
-                                // Сохраняем файл, если выбран
-                                if (pageNew.pFile && pageNew.pFile.length > 0 &&
-                                    appLogic && appLogic.convertAndSaveImageAsDicom) {
-
+                                // 2) Конвертация выбранного файла (если выбран)
+                                if (pageNew.pFile && pageNew.pFile.length > 0 && appLogic && appLogic.convertAndSaveImageAsDicom) {
                                     const res = appLogic.convertAndSaveImageAsDicom(
                                         pageNew.pFile,          // imagePath
                                         study.studyFolder,      // studyFolder
@@ -846,6 +766,8 @@ ApplicationWindow {
                             win.close()
                         }
                     }
+
+
                 }
             }
         }
