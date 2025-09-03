@@ -202,8 +202,8 @@ ApplicationWindow {
                                             selectedIsNew = true
                                             selectedIndex = -1
                                             patientsList.currentIndex = -1
-                                            if (appLogic && appLogic.clearSelectedPatient)        // NEW
-                                                appLogic.clearSelectedPatient()                    // NEW
+                                            if (appLogic && appLogic.clearSelectedPatient)
+                                                appLogic.clearSelectedPatient()
                                         }
                                         onDoubleClicked: {
                                             selectedIsNew = true
@@ -304,9 +304,8 @@ ApplicationWindow {
                                             patientsList.currentIndex = index
                                             selectedIndex = index
 
-                                            if (appLogic && appLogic.selectExistingPatient)       // NEW
-                                                appLogic.selectExistingPatient(index)              // NEW
-
+                                            if (appLogic && appLogic.selectExistingPatient)
+                                                appLogic.selectExistingPatient(index)
                                         }
 
                                         onDoubleClicked: {
@@ -314,8 +313,8 @@ ApplicationWindow {
                                             patientsList.currentIndex = index
                                             selectedIndex = index
 
-                                            if (appLogic && appLogic.selectExistingPatient)       // NEW
-                                                appLogic.selectExistingPatient(index)              // NEW
+                                            if (appLogic && appLogic.selectExistingPatient)
+                                                appLogic.selectExistingPatient(index)
 
                                             stack.push(nextPage, { existingMode: true, existingIndex: index })
                                         }
@@ -523,7 +522,7 @@ ApplicationWindow {
                             onTextChanged: if (!pageNew.existingMode) pageNew.pName = text
                             enabled: !pageNew.existingMode
                             readOnly: pageNew.existingMode
-                            maximumLength: 50 
+                            maximumLength: 50
                         }
 
                         Label { text: "Год рождения:" }
@@ -648,7 +647,6 @@ ApplicationWindow {
                     Layout.alignment: Qt.AlignRight
                     Layout.topMargin: 8
 
-
                     Button {
                         text: "Далее"
                         onClicked: {
@@ -659,7 +657,7 @@ ApplicationWindow {
                             if (pageNew.existingMode) {
                                 // === Существующий пациент ===
                                 if (appLogic && appLogic.selectExistingPatient && pageNew.existingIndex >= 0)
-                                    appLogic.selectExistingPatient(pageNew.existingIndex)     // зафиксировать выбор в C++
+                                    appLogic.selectExistingPatient(pageNew.existingIndex) // зафиксировать выбор в C++
 
                                 // Подтянуть недостающую демографию
                                 if ((!pageNew.pPatientFolder || !pageNew.pPatientID) &&
@@ -691,16 +689,8 @@ ApplicationWindow {
 
                                 // 2) Конвертация выбранного файла (если выбран)
                                 if (pageNew.pFile && pageNew.pFile.length > 0 && appLogic && appLogic.convertAndSaveImageAsDicom) {
-                                    const patient = appLogic.makePatientFromStrings(
-                                        pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
-                                    )
-                                    const res = appLogic.convertAndSaveImageAsDicom(
-                                        pageNew.pFile,          // imagePath
-                                        study.studyFolder,      // studyFolder
-                                        "SER01",                // seriesName
-                                        study.studyUID,         // studyUID
-                                        patient                 // QVariantMap
-                                    )
+                                    // NEW API: только путь к изображению
+                                    const res = appLogic.convertAndSaveImageAsDicom(pageNew.pFile) // NEW API
                                     // console.log("[QML] DICOM save (existing patient):", JSON.stringify(res))
                                 } else {
                                     console.log("[QML] No file selected; study folder created:", study.studyFolder)
@@ -713,18 +703,17 @@ ApplicationWindow {
                                     return
                                 }
 
+                                // Сформировать карту и передать в selectNewPatient (глобальное состояние)
                                 const patient = appLogic.makePatientFromStrings(
                                     pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
                                 )
-
-                                // Зафиксировать выбор нового пациента в C++
                                 if (appLogic && appLogic.selectNewPatient)
                                     appLogic.selectNewPatient(patient)
 
                                 // 1) Создание исследования для нового пациента
                                 let study = null
                                 if (appLogic && appLogic.createStudyForNewPatient) {
-                                    study = appLogic.createStudyForNewPatient(patient)
+                                    study = appLogic.createStudyForNewPatient() // NEW API: без параметров
                                     if (!study || !study.studyFolder) {
                                         console.warn("[QML] Failed to create study folder")
                                         return
@@ -732,7 +721,7 @@ ApplicationWindow {
 
                                     // 1a) Stub DICOM (демография)
                                     if (appLogic && appLogic.createPatientStubDicom && study.patientFolder) {
-                                        const stub = appLogic.createPatientStubDicom(study.patientFolder, patient)
+                                        const stub = appLogic.createPatientStubDicom(study.patientFolder) // NEW API: без patient
                                         if (!stub.ok) console.warn("[QML] Stub DICOM failed:", stub.error)
                                         else          console.log("[QML] Stub DICOM created:", stub.path)
                                     } else {
@@ -744,13 +733,7 @@ ApplicationWindow {
 
                                 // 2) Конвертация выбранного файла (если выбран)
                                 if (pageNew.pFile && pageNew.pFile.length > 0 && appLogic && appLogic.convertAndSaveImageAsDicom) {
-                                    const res = appLogic.convertAndSaveImageAsDicom(
-                                        pageNew.pFile,          // imagePath
-                                        study.studyFolder,      // studyFolder
-                                        "SER01",                // seriesName
-                                        study.studyUID,         // studyUID
-                                        patient                 // QVariantMap
-                                    )
+                                    const res = appLogic.convertAndSaveImageAsDicom(pageNew.pFile) // NEW API
                                     console.log("[QML] DICOM save (new patient):", JSON.stringify(res))
                                 } else {
                                     console.log("[QML] No file selected; study folder created:", study.studyFolder)
@@ -766,8 +749,6 @@ ApplicationWindow {
                             win.close()
                         }
                     }
-
-
                 }
             }
         }
