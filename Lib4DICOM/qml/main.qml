@@ -376,7 +376,6 @@ ApplicationWindow {
                                 }
                             }
 
-
                             Rectangle {
                                 anchors.left: parent.left
                                 anchors.right: parent.right
@@ -440,12 +439,47 @@ ApplicationWindow {
             property int    existingIndex: -1
 
             property string pName: ""
-            property string pBirth: ""
+            property string pBirthYear: ""
+            property string pBirthDA: ""
             property string pSex: ""
             property string pPatientID: ""
             property string pPatientFolder: ""
             property string pFile: ""
             property string pStudyLabel: ""
+
+            function daysInMonth(y, m) {
+                function leap(yy){ return (yy%4===0 && yy%100!==0) || (yy%400===0) }
+                if ([1,3,5,7,8,10,12].indexOf(m) !== -1) return 31
+                if ([4,6,9,11].indexOf(m) !== -1) return 30
+                return leap(y) ? 29 : 28
+            }
+            function to2(n){ return n<10 ? "0"+n : ""+n }
+
+            function syncBirthFromControls() {
+                const y = yearSpin.value
+                const m = monthCombo.currentValue || (monthCombo.currentIndex + 1)
+                const d = daySpin.value
+                pBirthYear = (""+y).slice(0,4)
+                pBirthDA   = pBirthYear.length===4 ? (pBirthYear + to2(m) + to2(d)) : ""
+            }
+
+            function setControlsFromString(b) { // b: "YYYY" или "YYYYMMDD"
+                if (!b) return
+                const yy = b.slice(0,4); yearSpin.value = parseInt(yy || "2000")
+                const mm = (b.length===8) ? parseInt(b.slice(4,6)) : 1
+                const dd = (b.length===8) ? parseInt(b.slice(6,8)) : 1
+
+                monthCombo.currentIndex = Math.max(0, Math.min(11, mm - 1))
+                const m = monthCombo.currentValue || (monthCombo.currentIndex + 1)
+
+                const dim = daysInMonth(yearSpin.value, m)
+                daySpin.to = dim
+                daySpin.value = Math.min(dd, dim)
+                syncBirthFromControls()
+            }
+
+
+
 
             Component.onCompleted: {
                 if (existingMode && existingIndex >= 0 && appLogic) {
@@ -456,7 +490,9 @@ ApplicationWindow {
                         const demo = appLogic.readDemographicsFromFile(stubInfo.stubPath)
                         if (demo && demo.ok) {
                             pName      = demo.patientName  || "--"
-                            pBirth     = demo.patientBirth || "--"
+                            const b    = demo.patientBirth || ""   // "YYYY" или "YYYYMMDD"
+                            pBirthYear = b.length >= 4 ? b.slice(0,4) : ""
+                            pBirthDA   = (b.length === 8) ? b : (pBirthYear ? (pBirthYear + "0101") : "")
                             pSex       = demo.patientSex   || "O"
                             pPatientID = demo.patientID    || "--"
                         }
@@ -465,12 +501,21 @@ ApplicationWindow {
                         const g = appLogic.getPatientDemographics(existingIndex)
                         if (g && g.ok) {
                             pName          = g.fullName       || pName
-                            pBirth         = g.birthYear      || pBirth
+                            pBirthYear     = g.birthYear      || pBirthYear  // модель даёт только год
+                            pBirthDA       = pBirthYear ? (pBirthYear + "0101") : pBirthDA
                             pSex           = g.sex            || pSex
                             pPatientID     = g.patientID      || pPatientID
                             pPatientFolder = g.patientFolder  || pPatientFolder
                         }
                     }
+                    // настроим контролы даты
+                    setControlsFromString(pBirthDA || pBirthYear)
+                } else {
+                    // новый пациент: дефолтная дата
+                    setControlsFromString("20000101")
+                }
+                if (appLogic && appLogic.setSelectedBirthDA && pBirthDA && pBirthDA.length === 8) {
+                    appLogic.setSelectedBirthDA(pBirthDA)    // передаём YYYYMMDD в C++
                 }
             }
 
@@ -503,58 +548,105 @@ ApplicationWindow {
                             maximumLength: 50
                         }
 
-                        Label { text: "Год рождения:" }
-                        TextField {
-                            id: birthField
+                        // ----- Режим ввода даты рождения -----
+                        Label { text: "Дата рождения:" }
+                        RowLayout {
                             Layout.fillWidth: true
-                            placeholderText: "YYYY"
-                            text: pageNew.pBirth
-                            enabled: !pageNew.existingMode
-                            readOnly: pageNew.existingMode
-                            maximumLength: 4
-                            validator: IntValidator { bottom: 0; top: 9999 }
-                            onTextChanged: if (!pageNew.existingMode) pageNew.pBirth = text
+                            spacing: 8
+
+                            // День
+                            SpinBox {
+                                id: daySpin
+                                from: 1
+                                to: 31
+                                value: 1
+                                Layout.preferredWidth: 72
+                                enabled: !pageNew.existingMode
+                                editable: !pageNew.existingMode
+                                onValueChanged: syncBirthFromControls()
+                            }
+
+                            // Месяц
+                            ComboBox {
+                                id: monthCombo
+                                Layout.preferredWidth: 160
+                                textRole: "text"
+                                valueRole: "value"
+                                enabled: !pageNew.existingMode
+                                model: [
+                                    { text: "Январь",   value: 1 },
+                                    { text: "Февраль",  value: 2 },
+                                    { text: "Март",     value: 3 },
+                                    { text: "Апрель",   value: 4 },
+                                    { text: "Май",      value: 5 },
+                                    { text: "Июнь",     value: 6 },
+                                    { text: "Июль",     value: 7 },
+                                    { text: "Август",   value: 8 },
+                                    { text: "Сентябрь", value: 9 },
+                                    { text: "Октябрь",  value: 10 },
+                                    { text: "Ноябрь",   value: 11 },
+                                    { text: "Декабрь",  value: 12 }
+                                ]
+
+                                onCurrentIndexChanged: {
+                                    const m = monthCombo.currentValue || (currentIndex + 1)
+                                    daySpin.to = daysInMonth(yearSpin.value, m)
+                                    if (daySpin.value > daySpin.to) daySpin.value = daySpin.to
+                                    syncBirthFromControls()
+                                }
+
+                                Component.onCompleted: {
+                                    if (currentIndex < 0) currentIndex = 0 // по умолчанию Январь
+                                }
+                            }
+
+                            // Год
+                            SpinBox {
+                                id: yearSpin
+                                from: 1900
+                                to: (new Date()).getFullYear()
+                                value: 2000
+                                editable: !pageNew.existingMode
+                                enabled: !pageNew.existingMode
+                                Layout.preferredWidth: 110
+                                onValueChanged: {
+                                    const m = monthCombo.currentValue || (monthCombo.currentIndex + 1)
+                                    daySpin.to = daysInMonth(yearSpin.value, m)
+                                    if (daySpin.value > daySpin.to) daySpin.value = daySpin.to
+                                    syncBirthFromControls()
+                                }
+                            }
                         }
 
                         Label { text: "Пол:" }
-
                         ComboBox {
                             id: sexCombo
                             Layout.fillWidth: true
                             textRole: "text"
-                            // valueRole можно оставить/убрать — для JS-массива он не обязателен
-                            // valueRole: "value"
                             model: [
                                 { text: "Мужской", value: "M" },
                                 { text: "Женский", value: "F" },
                                 { text: "Другое/не указано", value: "O" }
                             ]
-
-                            // Удобный хелпер, чтобы получать текущее value
                             function currentVal() {
                                 return (currentIndex >= 0 && model && model.length > currentIndex && model[currentIndex].value)
                                        ? model[currentIndex].value : "O"
                             }
-
                             onCurrentIndexChanged: {
                                 if (!pageNew.existingMode)
                                     pageNew.pSex = currentVal()
                             }
-
                             Component.onCompleted: {
                                 if (pageNew.existingMode) {
                                     const v = pageNew.pSex || "O"
                                     const idx = model.findIndex(m => m.value === v)
                                     if (idx >= 0) currentIndex = idx
                                 } else {
-                                    // проставим дефолт при создании
                                     pageNew.pSex = currentVal()
                                 }
                             }
-
                             enabled: !pageNew.existingMode
                         }
-
 
                         Label { text: "ID пациента:" }
                         TextField {
@@ -642,9 +734,16 @@ ApplicationWindow {
                     Layout.topMargin: 8
 
                     Button {
-                        text: "Далее"
+                        text: "Готово"
                         onClicked: {
-                            // 0) Метка исследования для C++
+                            // 1) Синхронизируем дату из контролов в pBirthYear/pBirthDA
+                            syncBirthFromControls()
+
+                            // 2) Передаём полный YYYYMMDD в C++ (если доступно)
+                            if (appLogic && appLogic.setSelectedBirthDA && pBirthDA && pBirthDA.length === 8)
+                                appLogic.setSelectedBirthDA(pBirthDA)
+
+                            // 3) Метка исследования для C++
                             if (appLogic && appLogic.studyLabel !== undefined)
                                 appLogic.studyLabel = pageNew.pStudyLabel || "Study"
 
@@ -653,7 +752,7 @@ ApplicationWindow {
                                 if (appLogic && appLogic.selectExistingPatient && pageNew.existingIndex >= 0)
                                     appLogic.selectExistingPatient(pageNew.existingIndex) // зафиксировать выбор в C++
 
-                                // Подтянуть недостающую демографию
+                                // Подтянуть недостающую демографию (если нужно)
                                 if ((!pageNew.pPatientFolder || !pageNew.pPatientID) &&
                                     appLogic && appLogic.getPatientDemographics && pageNew.existingIndex >= 0) {
                                     const g = appLogic.getPatientDemographics(pageNew.existingIndex)
@@ -661,16 +760,41 @@ ApplicationWindow {
                                         pageNew.pPatientFolder = pageNew.pPatientFolder || g.patientFolder
                                         pageNew.pPatientID     = pageNew.pPatientID     || g.patientID
                                         pageNew.pName          = pageNew.pName          || g.fullName
-                                        pageNew.pBirth         = pageNew.pBirth         || g.birthYear
+                                        pageNew.pBirthYear     = pageNew.pBirthYear     || g.birthYear
+                                        pageNew.pBirthDA       = pageNew.pBirthYear ? (pageNew.pBirthYear + "0101") : pageNew.pBirthDA
                                         pageNew.pSex           = pageNew.pSex           || g.sex
-                                    } else {
-                                        console.warn("[QML] getPatientDemographics failed:", g ? g.error : "undefined")
-                                        return
+                                        setControlsFromString(pageNew.pBirthDA || pageNew.pBirthYear)
+                                        if (appLogic && appLogic.setSelectedBirthDA && pageNew.pBirthDA && pageNew.pBirthDA.length === 8)
+                                            appLogic.setSelectedBirthDA(pageNew.pBirthDA)
+                                    }
+                                }
+
+                                // Фолбэк через stub
+                                if ((!pageNew.pPatientFolder || !pageNew.pPatientID) &&
+                                    appLogic && appLogic.findPatientStubByIndex && pageNew.existingIndex >= 0) {
+                                    const stubInfo = appLogic.findPatientStubByIndex(pageNew.existingIndex)
+                                    if (stubInfo && stubInfo.ok) {
+                                        pageNew.pPatientFolder = pageNew.pPatientFolder || stubInfo.patientFolder
+                                        if (!pageNew.pPatientID && appLogic.readDemographicsFromFile && stubInfo.stubPath) {
+                                            const demo = appLogic.readDemographicsFromFile(stubInfo.stubPath)
+                                            if (demo && demo.ok) {
+                                                pageNew.pPatientID = demo.patientID || pageNew.pPatientID
+                                                if (!pageNew.pBirthDA && demo.patientBirth) {
+                                                    pageNew.pBirthYear = demo.patientBirth.slice(0,4)
+                                                    pageNew.pBirthDA   = (demo.patientBirth.length === 8)
+                                                                         ? demo.patientBirth
+                                                                         : (pageNew.pBirthYear ? (pageNew.pBirthYear + "0101") : "")
+                                                    setControlsFromString(pageNew.pBirthDA || pageNew.pBirthYear)
+                                                }
+                                                pageNew.pName = pageNew.pName || demo.patientName
+                                                pageNew.pSex  = pageNew.pSex  || (demo.patientSex || "O")
+                                            }
+                                        }
                                     }
                                 }
 
                                 if (!pageNew.pPatientFolder || !pageNew.pPatientID) {
-                                    console.warn("[QML] patientFolder or patientID is empty")
+                                    console.warn("[QML] patientFolder or patientID is empty (idx:", pageNew.existingIndex, ")")
                                     return
                                 }
 
@@ -683,9 +807,7 @@ ApplicationWindow {
 
                                 // 2) Конвертация выбранного файла (если выбран)
                                 if (pageNew.pFile && pageNew.pFile.length > 0 && appLogic && appLogic.convertAndSaveImageAsDicom) {
-                                    // NEW API: только путь к изображению
-                                    const res = appLogic.convertAndSaveImageAsDicom(pageNew.pFile) // NEW API
-                                    // console.log("[QML] DICOM save (existing patient):", JSON.stringify(res))
+                                    appLogic.convertAndSaveImageAsDicom(pageNew.pFile)
                                 } else {
                                     console.log("[QML] No file selected; study folder created:", study.studyFolder)
                                 }
@@ -697,9 +819,9 @@ ApplicationWindow {
                                     return
                                 }
 
-                                // Сформировать карту и передать в selectNewPatient (глобальное состояние)
+                                // В КАРТУ — полный DA (для C++ он тоже сохранится в birthYear/birthDA)
                                 const patient = appLogic.makePatientFromStrings(
-                                    pageNew.pName, pageNew.pBirth, pageNew.pSex, pageNew.pPatientID
+                                    pageNew.pName, pageNew.pBirthDA, pageNew.pSex, pageNew.pPatientID
                                 )
                                 if (appLogic && appLogic.selectNewPatient)
                                     appLogic.selectNewPatient(patient)
@@ -707,7 +829,7 @@ ApplicationWindow {
                                 // 1) Создание исследования для нового пациента
                                 let study = null
                                 if (appLogic && appLogic.createStudyForNewPatient) {
-                                    study = appLogic.createStudyForNewPatient() // NEW API: без параметров
+                                    study = appLogic.createStudyForNewPatient()
                                     if (!study || !study.studyFolder) {
                                         console.warn("[QML] Failed to create study folder")
                                         return
@@ -715,7 +837,7 @@ ApplicationWindow {
 
                                     // 1a) Stub DICOM (демография)
                                     if (appLogic && appLogic.createPatientStubDicom && study.patientFolder) {
-                                        const stub = appLogic.createPatientStubDicom(study.patientFolder) // NEW API: без patient
+                                        const stub = appLogic.createPatientStubDicom(study.patientFolder)
                                         if (!stub.ok) console.warn("[QML] Stub DICOM failed:", stub.error)
                                         else          console.log("[QML] Stub DICOM created:", stub.path)
                                     } else {
@@ -727,20 +849,22 @@ ApplicationWindow {
 
                                 // 2) Конвертация выбранного файла (если выбран)
                                 if (pageNew.pFile && pageNew.pFile.length > 0 && appLogic && appLogic.convertAndSaveImageAsDicom) {
-                                    const res = appLogic.convertAndSaveImageAsDicom(pageNew.pFile) // NEW API
-                                    console.log("[QML] DICOM save (new patient):", JSON.stringify(res))
+                                    appLogic.convertAndSaveImageAsDicom(pageNew.pFile)
                                 } else {
                                     console.log("[QML] No file selected; study folder created:", study.studyFolder)
                                 }
                             }
 
-                            // Очистка и закрытие
+                            // Очистка
                             pageNew.pName = ""
-                            pageNew.pBirth = ""
+                            pageNew.pBirthYear = ""
+                            pageNew.pBirthDA   = ""
                             pageNew.pSex = sexCombo.currentVal()
                             pageNew.pFile = ""
                             pageNew.pPatientID = ""
-                            win.close()
+
+                            appLogic.scanPatients()
+                            stack.pop()
                         }
                     }
                 }

@@ -13,6 +13,7 @@ class OFString;
 struct Patient {
     QString fullName;     // "Иванов Иван"
     QString birthYear;    // "YYYY"
+    QString birthDA;      // "YYYYMMDD" или пусто
     QString sex;          // "M"/"F"/"O"
     QString patientID;    // "12345"
 
@@ -37,9 +38,9 @@ public:
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
-    
+
     void saveImagesAsDicom(const QVector<QImage>& images);
-    
+
     // ==== API для QML ====
     Q_INVOKABLE QVariantMap makePatientFromStrings(const QString& fullName,
         const QString& birthInput,
@@ -55,13 +56,16 @@ public:
     Q_INVOKABLE QVariantMap readDemographicsFromFile(const QString& dcmPath) const;
 
     Q_INVOKABLE void convertAndSaveImageAsDicom(const QString& imagePath);
-    
 
     // выбор пациента (глобальный state)
     Q_INVOKABLE void selectExistingPatient(int index);
     Q_INVOKABLE void selectNewPatient(const QVariantMap& patient);
     Q_INVOKABLE void clearSelectedPatient();
     QVariantMap selectedPatient() const;
+
+    // ==== НОВОЕ: передача полной даты рождения YYYYMMDD из QML ====
+    Q_INVOKABLE void setSelectedBirthDA(const QString& birthDA);
+    Q_INVOKABLE void   scanPatients();
 
 signals:
     void selectedPatientChanged();
@@ -70,8 +74,7 @@ signals:
 private:
     enum Roles { FullNameRole = Qt::UserRole + 1, BirthYearRole, SexRole };
 
-    // внутреннее
-    Q_INVOKABLE void   scanPatients();
+
     Q_INVOKABLE void   TESTlogSelectedFileAndPatient(const QString& filePath,
         const QString& fullName,
         const QString& birthYear,

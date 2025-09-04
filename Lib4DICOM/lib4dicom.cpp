@@ -1,4 +1,5 @@
-﻿#include "lib4dicom.h"
+﻿// lib4dicom.cpp
+#include "lib4dicom.h"
 
 #include <QCoreApplication>
 #include <QFileInfo>
@@ -59,19 +60,36 @@ QVariantMap Lib4DICOM::makePatientFromStrings(const QString& fullName,
 {
     Patient p;
     p.fullName = fullName.trimmed().isEmpty() ? QStringLiteral("--") : fullName.trimmed();
-    p.birthYear = birthInput;
+    const QString bi = birthInput.trimmed();
+
+    // Если пришла полная дата — сохраняем её и год
+    if (bi.size() == 8 && QDate::fromString(bi, "yyyyMMdd").isValid()) {
+        p.birthDA = bi;
+        p.birthYear = bi.left(4);
+    }
+    else if (bi.size() == 4 && bi.at(0).isDigit() && bi.at(1).isDigit()
+        && bi.at(2).isDigit() && bi.at(3).isDigit()) {
+        p.birthYear = bi;
+        p.birthDA.clear();
+    }
+    else {
+        p.birthYear.clear();
+        p.birthDA.clear();
+    }
     p.sex = sexInput;
     p.patientID = patientID;
 
     qDebug().noquote() << "[Lib4DICOM] Converted patient:"
         << "fullName=" << p.fullName
-        << "birthYear=" << p.birthYear
+        << "birthYear=" << (p.birthYear.isEmpty() ? "--" : p.birthYear)
+        << "birthDA=" << (p.birthDA.isEmpty() ? "--" : p.birthDA)
         << "sex=" << p.sex
         << "patientID=" << p.patientID;
 
     QVariantMap map;
     map["fullName"] = p.fullName;
     map["birthYear"] = p.birthYear;
+    map["birthDA"] = p.birthDA;      // кладём в карту
     map["sex"] = p.sex;
     map["patientID"] = p.patientID;
     return map;
@@ -336,8 +354,6 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder)
 {
     QVariantMap out;
 
-
-
     if (m_selectedPatient.fullName.trimmed().isEmpty() &&
         m_selectedPatient.patientID.trimmed().isEmpty())
     {
@@ -345,7 +361,6 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder)
     }
 
     const Patient& p = m_selectedPatient;
-  
 
     if (patientFolder.isEmpty() || !QDir(patientFolder).exists()) {
         out["ok"] = false; out["error"] = "patient folder does not exist"; return out;
@@ -369,19 +384,24 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder)
     DcmFileFormat file;
     DcmDataset* ds = file.getDataset();
 
-    const QString by = m_selectedPatient.birthYear.trimmed();
-    
+    // --- Пишем дату рождения: приоритет birthDA (YYYYMMDD), иначе YYYY0101 из birthYear ---
     {
-        const QString by = m_selectedPatient.birthYear.trimmed();
-        if (by.size() == 4 && by.at(0).isDigit() && by.at(1).isDigit()
-            && by.at(2).isDigit() && by.at(3).isDigit())
-        {
-            const QByteArray da = (by + "0101").toLatin1(); // VR=DA requires YYYYMMDD
-            ds->putAndInsertString(DCM_PatientBirthDate, da.constData());
+        const QString da = p.birthDA.trimmed();
+        if (da.size() == 8 && QDate::fromString(da, "yyyyMMdd").isValid()) {
+            ds->putAndInsertString(DCM_PatientBirthDate, da.toLatin1().constData());
             qDebug().noquote() << "[Lib4DICOM] Stub: wrote PatientBirthDate =" << da;
         }
+        else {
+            const QString by = p.birthYear.trimmed();
+            if (by.size() == 4 && by.at(0).isDigit() && by.at(1).isDigit()
+                && by.at(2).isDigit() && by.at(3).isDigit())
+            {
+                const QByteArray da2 = (by + "0101").toLatin1(); // VR=DA = YYYYMMDD
+                ds->putAndInsertString(DCM_PatientBirthDate, da2.constData());
+                qDebug().noquote() << "[Lib4DICOM] Stub: wrote PatientBirthDate =" << da2;
+            }
+        }
     }
-
 
     ds->putAndInsertString(DCM_SpecificCharacterSet, "ISO_IR 192");
     ds->putAndInsertString(DCM_SOPClassUID, UID_SecondaryCaptureImageStorage);
@@ -455,7 +475,6 @@ void Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
     }
 
     const Patient& p = m_selectedPatient;
-
 
     const QString outFolder = p.studyFolder;
     const QString seriesName = p.seriesName;
@@ -540,18 +559,23 @@ void Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
         ds->putAndInsertString(DCM_SpecificCharacterSet, "ISO_IR 192");
 
         const QString sopInstanceUID = generateDicomUID();
-        const QString by = p.birthYear.trimmed();
 
-
-        // === write PatientBirthDate as YYYY0101 if 4-digit year is present ===
+        // === Пишем PatientBirthDate: birthDA (YYYYMMDD) приоритетно, иначе YYYY0101 ===
         {
-            const QString by = p.birthYear.trimmed();
-            if (by.size() == 4 && by.at(0).isDigit() && by.at(1).isDigit()
-                && by.at(2).isDigit() && by.at(3).isDigit())
-            {
-                const QByteArray da = (by + "0101").toLatin1(); // VR=DA requires YYYYMMDD
-                ds->putAndInsertString(DCM_PatientBirthDate, da.constData());
+            const QString da = p.birthDA.trimmed();
+            if (da.size() == 8 && QDate::fromString(da, "yyyyMMdd").isValid()) {
+                ds->putAndInsertString(DCM_PatientBirthDate, da.toLatin1().constData());
                 qDebug().noquote() << "[Lib4DICOM] SC: wrote PatientBirthDate =" << da;
+            }
+            else {
+                const QString by = p.birthYear.trimmed();
+                if (by.size() == 4 && by.at(0).isDigit() && by.at(1).isDigit()
+                    && by.at(2).isDigit() && by.at(3).isDigit())
+                {
+                    const QByteArray da2 = (by + "0101").toLatin1();
+                    ds->putAndInsertString(DCM_PatientBirthDate, da2.constData());
+                    qDebug().noquote() << "[Lib4DICOM] SC: wrote PatientBirthDate =" << da2;
+                }
             }
         }
 
@@ -605,8 +629,7 @@ void Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
 
     qDebug().noquote() << "[Lib4DICOM] saveImagesAsDicom: saved" << saved
         << "of" << images.size()
-        << "files. studyUID=" << studyUID
-        << "seriesUID=" << seriesUID;
+        << "files.";
     if (saved != images.size()) {
         qWarning().noquote() << "[Lib4DICOM] saveImagesAsDicom: partial save, files:"
             << outFiles.join(", ");
@@ -810,8 +833,8 @@ QVariantMap Lib4DICOM::readDemographicsFromFile(const QString& dcmPath) const {
 
     out["patientName"] = q(DCM_PatientName).replace("^", " ");
     const QString birth = q(DCM_PatientBirthDate);
-    out["patientBirth"] = birth;                 // "YYYY" или "YYYYMMDD" — как есть
-    out["patientSex"] = q(DCM_PatientSex);     // "M"/"F"/"O"
+    out["patientBirth"] = birth;   // "YYYY" или "YYYYMMDD" — как есть
+    out["patientSex"] = q(DCM_PatientSex);   // "M"/"F"/"O"
     out["patientID"] = q(DCM_PatientID);
     out["ok"] = true;
     return out;
@@ -856,6 +879,7 @@ Patient Lib4DICOM::patientFromMap(const QVariantMap& m) {
     Patient p;
     p.fullName = m.value("fullName").toString();
     p.birthYear = m.value("birthYear").toString();
+    p.birthDA = m.value("birthDA").toString();   // полная дата, если есть
     p.sex = m.value("sex").toString();
     p.patientID = m.value("patientID").toString();
     p.patientFolder = m.value("patientFolder").toString();
@@ -872,6 +896,23 @@ void Lib4DICOM::setStudyLabel(const QString& s) {
     if (v == m_studyLabel) return;
     m_studyLabel = v;
     emit studyLabelChanged();
+}
+
+// Установка полной даты рождения выбранного пациента (YYYYMMDD)
+void Lib4DICOM::setSelectedBirthDA(const QString& da)
+{
+    const QString v = da.trimmed();
+    if (v == m_selectedPatient.birthDA) return;
+    // сохраняем только валидную полную дату; иначе очищаем
+    if (v.size() == 8 && QDate::fromString(v, "yyyyMMdd").isValid()) {
+        m_selectedPatient.birthDA = v;
+        if (m_selectedPatient.birthYear.isEmpty())
+            m_selectedPatient.birthYear = v.left(4);
+    }
+    else {
+        m_selectedPatient.birthDA.clear();
+    }
+    emit selectedPatientChanged();
 }
 
 // Замена пробелов и опасных символов
@@ -900,7 +941,7 @@ void Lib4DICOM::selectExistingPatient(int index)
         return;
     }
 
-    m_selectedPatient = p;
+    m_selectedPatient = p; // обратите внимание: birthDA в списке пациентов не сканируем — будет задана через setSelectedBirthDA при наличии stub
     emit selectedPatientChanged();
 
     qDebug().noquote() << "[Lib4DICOM] selected existing patient:"
@@ -926,7 +967,8 @@ void Lib4DICOM::selectNewPatient(const QVariantMap& patient)
         << m_selectedPatient.fullName
         << m_selectedPatient.birthYear
         << m_selectedPatient.sex
-        << m_selectedPatient.patientID;
+        << m_selectedPatient.patientID
+        << "birthDA=" << (m_selectedPatient.birthDA.isEmpty() ? "--" : m_selectedPatient.birthDA);
 }
 
 void Lib4DICOM::clearSelectedPatient()
@@ -957,5 +999,7 @@ QVariantMap Lib4DICOM::selectedPatient() const
     map["studyFolder"] = m_selectedPatient.studyFolder;
     map["studyUID"] = m_selectedPatient.studyUID;
     map["seriesName"] = m_selectedPatient.seriesName;
+    // при необходимости можно вернуть и birthDA:
+    // map["birthDA"]   = m_selectedPatient.birthDA;
     return map;
 }
