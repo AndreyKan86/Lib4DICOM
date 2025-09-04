@@ -1,8 +1,8 @@
 ﻿#include "lib4dicom.h"
 
 #include <QCoreApplication>
-#include <QFile>
 #include <QFileInfo>
+#include <QFile>
 #include <QDir>
 #include <QDate>
 #include <QTime>
@@ -137,14 +137,10 @@ QVariantMap Lib4DICOM::createStudyForNewPatient()
         studyFolder = QDir(patientFolder).absoluteFilePath(base + "_" + QString::number(n++));
     }
     if (n > 9999) {
-        out["ok"] = false;
-        out["error"] = "too many duplicates for study";
-        return out;
+        out["ok"] = false; out["error"] = "too many duplicates for study"; return out;
     }
     if (!QDir().mkpath(studyFolder)) {
-        out["ok"] = false;
-        out["error"] = "failed to create study folder";
-        return out;
+        out["ok"] = false; out["error"] = "failed to create study folder"; return out;
     }
 
     // 4) UID исследования
@@ -168,7 +164,7 @@ QVariantMap Lib4DICOM::createStudyForNewPatient()
     m_selectedPatient.studyFolder = studyFolder;
     m_selectedPatient.studyUID = studyUID;
     if (m_selectedPatient.seriesName.trimmed().isEmpty())
-        m_selectedPatient.seriesName = safeLabel; // дефолт: метка исследования или "Study"
+        m_selectedPatient.seriesName = safeLabel; // дефолт
     emit selectedPatientChanged();
 
     return out;
@@ -209,21 +205,24 @@ QVector<QImage> Lib4DICOM::TESTloadImageVectorFromFile(const QString& localPath)
 }
 
 // ---------------- Комбайн: загрузить картинку и сохранить как DICOM ----------------
-QVariantMap Lib4DICOM::convertAndSaveImageAsDicom(const QString& imagePath)
+void Lib4DICOM::convertAndSaveImageAsDicom(const QString& imagePath)
 {
-    QVariantMap r;
-
     if (m_selectedPatient.fullName.trimmed().isEmpty() &&
         m_selectedPatient.patientID.trimmed().isEmpty())
     {
-        r["ok"] = false; r["error"] = "no selected patient"; return r;
+        qWarning().noquote() << "[Lib4DICOM] convertAndSaveImageAsDicom: no selected patient";
+        return;
     }
 
     QImage img = TESTloadImageFromFile(imagePath);
-    if (img.isNull()) { r["ok"] = false; r["error"] = "failed to load image"; return r; }
+    if (img.isNull()) {
+        qWarning().noquote() << "[Lib4DICOM] convertAndSaveImageAsDicom: failed to load image:" << imagePath;
+        return;
+    }
 
-    QVector<QImage> vec; vec.push_back(img);
-    return saveImagesAsDicom(vec);
+    QVector<QImage> vec;
+    vec.push_back(img);
+    saveImagesAsDicom(vec);
 }
 
 // ---------------- Декодер строк из DICOM с учётом кодировки ----------------
@@ -242,12 +241,11 @@ QString Lib4DICOM::decodeDicomText(const OFString& value, const OFString& specif
         return QString::fromLatin1(bytes);     // Latin-1 (по умолчанию)
     }
     else {
-        // На всякий случай — пробуем как UTF-8
-        return QString::fromUtf8(bytes);
+        return QString::fromUtf8(bytes);       // на всякий случай
     }
 }
 
-// ---------------- Сканирование пациентов (чтение DICOM, поддержка UTF-8) ----------------
+// ---------------- Сканирование пациентов ----------------
 void Lib4DICOM::scanPatients() {
     beginResetModel();
     m_patients.clear();
@@ -270,9 +268,8 @@ void Lib4DICOM::scanPatients() {
     auto patientFolderOf = [](const QString& filePath) -> QString {
         QFileInfo fi(filePath);
         QDir d = fi.dir();
-        // эвристика: если текущая папка похожа на study (ID_YYYYMMDD...), берём родителя
         if (d.dirName().contains('_'))
-            d.cdUp();
+            d.cdUp(); // поднимаемся из study-папки
         return d.absolutePath();
         };
 
@@ -301,22 +298,21 @@ void Lib4DICOM::scanPatients() {
         ds->findAndGetOFString(DCM_SpecificCharacterSet, cs);
 
         Patient p;
-        // Name
         if (ds->findAndGetOFString(DCM_PatientName, v).good())
             p.fullName = decodeDicomText(v, cs).replace("^", " ");
         else
             p.fullName = "--";
-        // Birth (год)
+
         if (ds->findAndGetOFString(DCM_PatientBirthDate, v).good() && v.length() >= 4)
             p.birthYear = decodeDicomText(v, cs).left(4);
         else
             p.birthYear = "--";
-        // Sex
+
         if (ds->findAndGetOFString(DCM_PatientSex, v).good())
             p.sex = decodeDicomText(v, cs);
         else
             p.sex = "--";
-        // PatientID
+
         if (ds->findAndGetOFString(DCM_PatientID, v).good())
             p.patientID = decodeDicomText(v, cs);
         else
@@ -331,9 +327,7 @@ void Lib4DICOM::scanPatients() {
         }
     }
 
-    // Переносим в модель
     m_patients = uniq.values();
-
     endResetModel();
 }
 
@@ -342,6 +336,8 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder)
 {
     QVariantMap out;
 
+
+
     if (m_selectedPatient.fullName.trimmed().isEmpty() &&
         m_selectedPatient.patientID.trimmed().isEmpty())
     {
@@ -349,7 +345,7 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder)
     }
 
     const Patient& p = m_selectedPatient;
-    const QString birth = p.birthRaw.isEmpty() ? p.birthYear : p.birthRaw;
+  
 
     if (patientFolder.isEmpty() || !QDir(patientFolder).exists()) {
         out["ok"] = false; out["error"] = "patient folder does not exist"; return out;
@@ -357,7 +353,6 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder)
 
     const QByteArray baPN = p.fullName.toUtf8();
     const QByteArray baPID = p.patientID.toUtf8();
-    const QByteArray baDA = birth.toUtf8();
     const QByteArray baSex = p.sex.toUtf8();
 
     const QString studyUID = generateDicomUID();
@@ -374,6 +369,20 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder)
     DcmFileFormat file;
     DcmDataset* ds = file.getDataset();
 
+    const QString by = m_selectedPatient.birthYear.trimmed();
+    
+    {
+        const QString by = m_selectedPatient.birthYear.trimmed();
+        if (by.size() == 4 && by.at(0).isDigit() && by.at(1).isDigit()
+            && by.at(2).isDigit() && by.at(3).isDigit())
+        {
+            const QByteArray da = (by + "0101").toLatin1(); // VR=DA requires YYYYMMDD
+            ds->putAndInsertString(DCM_PatientBirthDate, da.constData());
+            qDebug().noquote() << "[Lib4DICOM] Stub: wrote PatientBirthDate =" << da;
+        }
+    }
+
+
     ds->putAndInsertString(DCM_SpecificCharacterSet, "ISO_IR 192");
     ds->putAndInsertString(DCM_SOPClassUID, UID_SecondaryCaptureImageStorage);
     ds->putAndInsertString(DCM_SOPInstanceUID, sopUID.toLatin1().constData());
@@ -383,7 +392,6 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder)
     ds->putAndInsertString(DCM_PatientID, baPID.constData());
     ds->putAndInsertString(DCM_PatientName, baPN.constData());
     ds->putAndInsertString(DCM_PatientSex, baSex.constData());
-    if (!baDA.isEmpty()) ds->putAndInsertString(DCM_PatientBirthDate, baDA.constData());
 
     ds->putAndInsertString(DCM_StudyDate, studyDate.toLatin1().constData());
     ds->putAndInsertString(DCM_StudyTime, studyTime.toLatin1().constData());
@@ -422,30 +430,32 @@ QVariantMap Lib4DICOM::createPatientStubDicom(const QString& patientFolder)
         EXS_LittleEndianExplicit, EET_ExplicitLength, EGL_recalcGL, EPD_withoutPadding);
     if (st.good()) {
         qDebug().noquote() << "[Lib4DICOM] patient stub saved:" << absPath;
-        out["ok"] = true; out["path"] = absPath;
+        out["ok"] = true;
+        out["path"] = absPath;
     }
     else {
         qWarning().noquote() << "[Lib4DICOM] patient stub save failed:" << st.text();
-        out["ok"] = false; out["error"] = QString::fromLatin1(st.text());
+        out["ok"] = false;
+        out["error"] = QString::fromLatin1(st.text());
     }
     return out;
 }
 
-// ---------------- Сохранение DICOM (SC) — полная версия с демографией ----------------
-QVariantMap Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
+// ---------------- Сохранение DICOM (SC) ----------------
+void Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
 {
-    QVariantMap result;
-
     if (m_selectedPatient.fullName.trimmed().isEmpty() &&
         m_selectedPatient.patientID.trimmed().isEmpty()) {
-        result["ok"] = false; result["error"] = "no selected patient"; return result;
+        qWarning().noquote() << "[Lib4DICOM] saveImagesAsDicom: no selected patient";
+        return;
     }
     if (images.isEmpty()) {
-        result["ok"] = false; result["error"] = "images is empty"; return result;
+        qWarning().noquote() << "[Lib4DICOM] saveImagesAsDicom: images is empty";
+        return;
     }
 
     const Patient& p = m_selectedPatient;
-    const QString birth = p.birthRaw.isEmpty() ? p.birthYear : p.birthRaw;
+
 
     const QString outFolder = p.studyFolder;
     const QString seriesName = p.seriesName;
@@ -453,12 +463,13 @@ QVariantMap Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
 
     QDir dir(outFolder);
     if (outFolder.isEmpty() || !dir.exists()) {
-        result["ok"] = false; result["error"] = "output folder does not exist"; return result;
+        qWarning().noquote() << "[Lib4DICOM] saveImagesAsDicom: output folder does not exist:" << outFolder;
+        return;
     }
 
     const QDateTime now = QDateTime::currentDateTime();
-    const QString studyDate = now.date().toString("yyyyMMdd");
-    const QString studyTime = now.time().toString("HHmmss");
+    const QString   studyDate = now.date().toString("yyyyMMdd");
+    const QString   studyTime = now.time().toString("HHmmss");
 
     const QString studyUID = studyUIDIn.isEmpty() ? generateDicomUID() : studyUIDIn;
     const QString seriesUID = generateDicomUID();
@@ -470,7 +481,6 @@ QVariantMap Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
 
     const QByteArray baPN = p.fullName.toUtf8();
     const QByteArray baPID = idToken.toUtf8();
-    const QByteArray baDA = birth.toUtf8();
     const QByteArray baSex = p.sex.toUtf8();
 
     QStringList outFiles;
@@ -530,6 +540,21 @@ QVariantMap Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
         ds->putAndInsertString(DCM_SpecificCharacterSet, "ISO_IR 192");
 
         const QString sopInstanceUID = generateDicomUID();
+        const QString by = p.birthYear.trimmed();
+
+
+        // === write PatientBirthDate as YYYY0101 if 4-digit year is present ===
+        {
+            const QString by = p.birthYear.trimmed();
+            if (by.size() == 4 && by.at(0).isDigit() && by.at(1).isDigit()
+                && by.at(2).isDigit() && by.at(3).isDigit())
+            {
+                const QByteArray da = (by + "0101").toLatin1(); // VR=DA requires YYYYMMDD
+                ds->putAndInsertString(DCM_PatientBirthDate, da.constData());
+                qDebug().noquote() << "[Lib4DICOM] SC: wrote PatientBirthDate =" << da;
+            }
+        }
+
         ds->putAndInsertString(DCM_SOPClassUID, UID_SecondaryCaptureImageStorage);
         ds->putAndInsertString(DCM_SOPInstanceUID, sopInstanceUID.toLatin1().constData());
         ds->putAndInsertString(DCM_StudyInstanceUID, studyUID.toLatin1().constData());
@@ -538,7 +563,6 @@ QVariantMap Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
         ds->putAndInsertString(DCM_PatientID, baPID.constData());
         ds->putAndInsertString(DCM_PatientName, baPN.constData());
         ds->putAndInsertString(DCM_PatientSex, baSex.constData());
-        if (!baDA.isEmpty()) ds->putAndInsertString(DCM_PatientBirthDate, baDA.constData());
 
         ds->putAndInsertString(DCM_StudyDate, studyDate.toLatin1().constData());
         ds->putAndInsertString(DCM_StudyTime, studyTime.toLatin1().constData());
@@ -571,18 +595,22 @@ QVariantMap Lib4DICOM::saveImagesAsDicom(const QVector<QImage>& images)
 
         const OFCondition st = file.saveFile(absPath.toLocal8Bit().constData(),
             EXS_LittleEndianExplicit, EET_ExplicitLength, EGL_recalcGL, EPD_withoutPadding);
-        if (st.good()) { ++saved; outFiles << absPath; }
-        else { qWarning().noquote() << "[Lib4DICOM] save failed for" << absPath << ":" << st.text(); }
+        if (st.good()) {
+            ++saved; outFiles << absPath;
+        }
+        else {
+            qWarning().noquote() << "[Lib4DICOM] save failed for" << absPath << ":" << st.text();
+        }
     }
 
-    result["ok"] = (saved == images.size());
-    result["saved"] = saved;
-    result["studyUID"] = studyUID;
-    result["seriesUID"] = seriesUID;
-    result["files"] = outFiles;
-    if (saved != images.size())
-        result["error"] = QString("saved %1 of %2").arg(saved).arg(images.size());
-    return result;
+    qDebug().noquote() << "[Lib4DICOM] saveImagesAsDicom: saved" << saved
+        << "of" << images.size()
+        << "files. studyUID=" << studyUID
+        << "seriesUID=" << seriesUID;
+    if (saved != images.size()) {
+        qWarning().noquote() << "[Lib4DICOM] saveImagesAsDicom: partial save, files:"
+            << outFiles.join(", ");
+    }
 }
 
 // Получение демографии пациента по индексу
@@ -603,7 +631,8 @@ QVariantMap Lib4DICOM::getPatientDemographics(int index) const {
 
 // Создание исследования в папке существующего пациента
 QVariantMap Lib4DICOM::createStudyInPatientFolder(const QString& patientFolder,
-    const QString& /*patientID*/) {
+    const QString& /*patientID*/)
+{
     QVariantMap out;
 
     if (patientFolder.isEmpty() || !QDir(patientFolder).exists()) {
@@ -681,7 +710,7 @@ QVariantMap Lib4DICOM::findPatientStubByIndex(int index) const {
     if (index < 0 || index >= m_patients.size()) { out["error"] = "index out of range"; return out; }
 
     const Patient& P = m_patients.at(index);
-    const QString wantedPID = P.patientID.trimmed();
+    const QString  wantedPID = P.patientID.trimmed();
 
     const QString root = QCoreApplication::applicationDirPath() + "/patients";
 
@@ -781,8 +810,8 @@ QVariantMap Lib4DICOM::readDemographicsFromFile(const QString& dcmPath) const {
 
     out["patientName"] = q(DCM_PatientName).replace("^", " ");
     const QString birth = q(DCM_PatientBirthDate);
-    out["patientBirth"] = birth;              // "YYYY" или "YYYYMMDD" — как есть
-    out["patientSex"] = q(DCM_PatientSex);  // "M"/"F"/"O"
+    out["patientBirth"] = birth;                 // "YYYY" или "YYYYMMDD" — как есть
+    out["patientSex"] = q(DCM_PatientSex);     // "M"/"F"/"O"
     out["patientID"] = q(DCM_PatientID);
     out["ok"] = true;
     return out;
@@ -827,7 +856,6 @@ Patient Lib4DICOM::patientFromMap(const QVariantMap& m) {
     Patient p;
     p.fullName = m.value("fullName").toString();
     p.birthYear = m.value("birthYear").toString();
-    p.birthRaw = m.value("birthRaw").toString();
     p.sex = m.value("sex").toString();
     p.patientID = m.value("patientID").toString();
     p.patientFolder = m.value("patientFolder").toString();
@@ -837,9 +865,7 @@ Patient Lib4DICOM::patientFromMap(const QVariantMap& m) {
     return p;
 }
 
-QString Lib4DICOM::studyLabel() const {
-    return m_studyLabel;
-}
+QString Lib4DICOM::studyLabel() const { return m_studyLabel; }
 
 void Lib4DICOM::setStudyLabel(const QString& s) {
     QString v = s.trimmed().isEmpty() ? "Study" : s;
@@ -848,15 +874,12 @@ void Lib4DICOM::setStudyLabel(const QString& s) {
     emit studyLabelChanged();
 }
 
-// Заменяет любые пробелы на "_", убирает опасные для файловой системы символы
+// Замена пробелов и опасных символов
 QString Lib4DICOM::sanitizeName(const QString& in)
 {
     QString s = in.trimmed();
-    // Любые последовательности пробелов/табов/переводов строк -> "_"
     s.replace(QRegularExpression(R"(\s+)"), "_");
-    // Запрещённые в Windows символы -> "_"
     s.replace(QRegularExpression(R"([\\/:*?"<>|])"), "_");
-    // Во избежание двойных подчёркиваний
     s.replace(QRegularExpression(R"(_{2,})"), "_");
     return s;
 }
@@ -870,7 +893,6 @@ void Lib4DICOM::selectExistingPatient(int index)
 
     const Patient& p = m_patients.at(index);
 
-    // Если уже выбран тот же — можно ничего не делать (опционально)
     if (m_selectedPatient.patientID == p.patientID &&
         m_selectedPatient.fullName == p.fullName &&
         m_selectedPatient.birthYear == p.birthYear &&
@@ -892,11 +914,10 @@ void Lib4DICOM::selectNewPatient(const QVariantMap& patient)
 {
     Patient p = patientFromMap(patient);
 
-    // Нормализуем пустоты
-    if (p.fullName.trimmed() == "--")   p.fullName.clear();
-    if (p.birthYear.trimmed() == "--")  p.birthYear.clear();
-    if (p.sex.trimmed() == "--")        p.sex.clear();
-    if (p.patientID.trimmed() == "--")  p.patientID.clear();
+    if (p.fullName.trimmed() == "--") p.fullName.clear();
+    if (p.birthYear.trimmed() == "--") p.birthYear.clear();
+    if (p.sex.trimmed() == "--") p.sex.clear();
+    if (p.patientID.trimmed() == "--") p.patientID.clear();
 
     m_selectedPatient = std::move(p);
     emit selectedPatientChanged();
@@ -930,7 +951,6 @@ QVariantMap Lib4DICOM::selectedPatient() const
     map["ok"] = true;
     map["fullName"] = m_selectedPatient.fullName;
     map["birthYear"] = m_selectedPatient.birthYear;
-    map["birthRaw"] = m_selectedPatient.birthRaw;
     map["sex"] = m_selectedPatient.sex;
     map["patientID"] = m_selectedPatient.patientID;
     map["patientFolder"] = m_selectedPatient.patientFolder;

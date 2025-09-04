@@ -334,17 +334,19 @@ ApplicationWindow {
                                 anchors.fill: parent
                                 spacing: 0
 
-                                // ФИО
+                                // ОДНА строка поиска по ФИО на всю ширину
                                 Rectangle {
-                                    width: tableFrame.nameW
+                                    width: parent.width
                                     height: parent.height
                                     color: "transparent"
+
                                     RowLayout {
                                         anchors.fill: parent
                                         anchors.margins: 6
                                         spacing: 6
 
                                         TextField {
+                                            id: searchName
                                             Layout.fillWidth: true
                                             placeholderText: "Поиск по ФИО…"
                                             text: tableFrame.filterName
@@ -354,50 +356,26 @@ ApplicationWindow {
                                             background: Rectangle {
                                                 radius: 6
                                                 color: tableFrame.uiFieldBg
-                                                border.color: parent.focus ? tableFrame.uiFieldBorderFocus
-                                                                           : tableFrame.uiFieldBorder
+                                                border.color: parent.focus
+                                                             ? tableFrame.uiFieldBorderFocus
+                                                             : tableFrame.uiFieldBorder
                                                 border.width: 1
                                             }
                                         }
 
                                         ToolButton {
                                             text: "×"
-                                            visible: tableFrame.filterName.length > 0
-                                            onClicked: tableFrame.filterName = ""
+                                            visible: searchName.text.length > 0
+                                            onClicked: {
+                                                searchName.clear()
+                                                tableFrame.filterName = ""
+                                            }
                                             background: Rectangle { radius: 6; color: "transparent" }
                                         }
                                     }
                                 }
-
-                                Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
-
-                                // Год
-                                Rectangle {
-                                    width: tableFrame.yearW
-                                    height: parent.height
-                                    color: "transparent"
-                                    TextField {
-                                        anchors.fill: parent
-                                        anchors.margins: 6
-                                        placeholderText: "Год…"
-                                        inputMethodHints: Qt.ImhPreferNumbers
-                                        text: tableFrame.filterBirth
-                                        onTextChanged: tableFrame.filterBirth = text
-                                        horizontalAlignment: Text.AlignHCenter
-                                        color: tableFrame.uiText
-                                        placeholderTextColor: tableFrame.uiTextHint
-                                        background: Rectangle {
-                                            radius: 6
-                                            color: tableFrame.uiFieldBg
-                                            border.color: parent.focus ? tableFrame.uiFieldBorderFocus
-                                                                       : tableFrame.uiFieldBorder
-                                            border.width: 1
-                                        }
-                                    }
-                                }
-
-                                Rectangle { width: tableFrame.sepW; height: parent.height; color: tableFrame.gridColor }
                             }
+
 
                             Rectangle {
                                 anchors.left: parent.left
@@ -539,28 +517,44 @@ ApplicationWindow {
                         }
 
                         Label { text: "Пол:" }
+
                         ComboBox {
                             id: sexCombo
                             Layout.fillWidth: true
                             textRole: "text"
-                            valueRole: "value"
+                            // valueRole можно оставить/убрать — для JS-массива он не обязателен
+                            // valueRole: "value"
                             model: [
                                 { text: "Мужской", value: "M" },
                                 { text: "Женский", value: "F" },
                                 { text: "Другое/не указано", value: "O" }
                             ]
-                            onCurrentIndexChanged: if (!pageNew.existingMode) pageNew.pSex = currentValue || "O"
+
+                            // Удобный хелпер, чтобы получать текущее value
+                            function currentVal() {
+                                return (currentIndex >= 0 && model && model.length > currentIndex && model[currentIndex].value)
+                                       ? model[currentIndex].value : "O"
+                            }
+
+                            onCurrentIndexChanged: {
+                                if (!pageNew.existingMode)
+                                    pageNew.pSex = currentVal()
+                            }
+
                             Component.onCompleted: {
                                 if (pageNew.existingMode) {
                                     const v = pageNew.pSex || "O"
                                     const idx = model.findIndex(m => m.value === v)
                                     if (idx >= 0) currentIndex = idx
                                 } else {
-                                    pageNew.pSex = currentValue
+                                    // проставим дефолт при создании
+                                    pageNew.pSex = currentVal()
                                 }
                             }
+
                             enabled: !pageNew.existingMode
                         }
+
 
                         Label { text: "ID пациента:" }
                         TextField {
@@ -743,7 +737,7 @@ ApplicationWindow {
                             // Очистка и закрытие
                             pageNew.pName = ""
                             pageNew.pBirth = ""
-                            pageNew.pSex = sexCombo.currentValue
+                            pageNew.pSex = sexCombo.currentVal()
                             pageNew.pFile = ""
                             pageNew.pPatientID = ""
                             win.close()
